@@ -1,0 +1,17 @@
+:root {
+  --color-text: #0d1511;
+  --color-muted: #24352c;
+  --color-page: #edf4ef;
+  --color-surface: #ffffff;
+  --color-soft: #f3f8f5;
+  --color-border: #d5e2d9;
+  --color-border-strong: #c1d0c6;
+  --color-primary: #167348;
+  --color-danger: #b13b2e;
+  --color-danger-text: #6a241e;
+  --color-danger-soft: #f4dfdc;
+  --color-control: #e4eee7;
+  --color-control-strong: #ddebe2;
+  --radius: 8px;
+  --font-main: Arial, sans-serif;
+}
