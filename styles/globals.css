@@ -1,23 +1,48 @@
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
+}
+
+html {
+  min-block-size: 100%;
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
-  min-height: 100vh;
-  font-family: var(--font-main);
-  color: var(--color-text);
-  background: var(--color-page);
-  font-size: 18px;
-}
-
-button,
-input {
-  font: inherit;
 }
 
 h1,
 h2,
+h3,
+h4,
+h5,
+h6,
 p {
-  margin-top: 0;
+  margin: 0;
+}
+
+ul,
+ol,
+li {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+button,
+input,
+textarea,
+select {
+  color: inherit;
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
 }

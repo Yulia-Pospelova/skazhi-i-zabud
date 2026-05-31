@@ -2,11 +2,16 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Сроки</title>
-    <link rel="stylesheet" href="styles/style.css" />
+    <title>Скажи и забудь</title>
+    <link rel="stylesheet" href="./fonts/fonts.css" />
+    <link rel="stylesheet" href="./styles/variables.css" />
+    <link rel="stylesheet" href="./styles/globals.css" />
+    <link rel="stylesheet" href="./styles/style.css" />
+    <script src="./script.js" defer></script>
   </head>
-  <body>
+  <body class="page">
     <main class="app">
       <section class="hero">
         <h1>Скажи и забудь</h1>
@@ -14,11 +19,16 @@
           <button class="notify-button" type="button">
             Настроить уведомления
           </button>
-          <button class="examples-button" type="button" aria-expanded="false">
+          <button
+            class="examples-button"
+            type="button"
+            aria-expanded="false"
+            aria-controls="examples-panel"
+          >
             Примеры
           </button>
         </div>
-        <div class="examples-panel" hidden>
+        <div class="examples-panel" id="examples-panel" hidden>
           <p>Молоко до 5 июня</p>
           <p>Паспорт до марта следующего года</p>
           <p>Звонок маме сегодня в 8 вечера</p>
@@ -32,9 +42,13 @@
         <p class="notify-status" aria-live="polite"></p>
       </section>
 
-      <section class="capture" aria-label="Добавить срок">
+      <section class="capture" aria-label="Напоминание">
         <p class="start-hint">Нажми старт и скажи</p>
-        <button class="start-button" type="button">
+        <button
+          class="start-button"
+          type="button"
+          aria-label="Начать голосовую запись"
+        >
           <span class="start-icon">●</span>
           <span class="start-text">Старт</span>
         </button>
@@ -58,12 +72,16 @@
       <section class="timeline">
         <div class="timeline-head">
           <h2>Ближайшие сроки</h2>
-          <button class="clear-button" type="button">Очистить все</button>
+          <button
+            class="clear-button"
+            type="button"
+            aria-label="Удалить все записи"
+          >
+            Очистить все
+          </button>
         </div>
         <ul class="list"></ul>
       </section>
     </main>
-
-    <script src="script.js"></script>
   </body>
 </html>

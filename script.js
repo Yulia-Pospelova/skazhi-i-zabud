@@ -518,7 +518,7 @@ function renderList() {
     days.className = "item-days";
     deleteButton.className = "delete-button";
     deleteButton.type = "button";
-    deleteButton.setAttribute("aria-label", `Удалить ${item.name}`);
+    deleteButton.setAttribute("aria-label", `Удалить напоминание ${item.name}`);
 
     name.textContent = item.name;
     date.textContent = formatDate(item.date, item.time);

@@ -1,9 +1,16 @@
-@import url("../fonts/fonts.css");
-@import url("./variables.css");
-@import url("./globals.css");
+.page {
+  min-inline-size: 320px;
+  min-block-size: 100vh;
+  min-block-size: 100dvb;
+  margin: 0 auto;
+  font-family: var(--font-main);
+  color: var(--color-text);
+  background: var(--color-page);
+  font-size: 18px;
+}
 
 .app {
-  width: min(680px, 100%);
+  inline-size: min(680px, 100%);
   margin: 0 auto;
   padding: 28px 18px 42px;
 }
@@ -26,7 +33,7 @@ h1 {
 }
 
 .subtitle {
-  max-width: 520px;
+  max-inline-size: 520px;
   margin-bottom: 0;
   color: #526259;
   font-size: 18px;
@@ -43,8 +50,8 @@ h1 {
 }
 
 .start-button {
-  width: 100%;
-  min-height: 156px;
+  inline-size: 100%;
+  min-block-size: 156px;
   display: grid;
   place-items: center;
   gap: 6px;
@@ -71,7 +78,7 @@ h1 {
 }
 
 .examples-button {
-  min-height: 40px;
+  min-block-size: 40px;
   padding: 0 13px;
   border: 0;
   border-radius: var(--radius);
@@ -112,8 +119,8 @@ h1 {
 }
 
 .start-icon {
-  width: 34px;
-  height: 34px;
+  inline-size: 34px;
+  block-size: 34px;
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -134,9 +141,9 @@ h1 {
 }
 
 .phrase-input {
-  width: 100%;
-  min-width: 0;
-  min-height: 58px;
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 58px;
   padding: 15px 14px;
   border: 2px solid var(--color-border-strong);
   border-radius: var(--radius);
@@ -155,7 +162,7 @@ h1 {
 }
 
 .status {
-  min-height: 28px;
+  min-block-size: 28px;
   margin: 14px 0 0;
   color: var(--color-muted);
   font-size: 18px;
@@ -173,8 +180,8 @@ h1 {
 
 .sr-status {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  inline-size: 1px;
+  block-size: 1px;
   margin: -1px;
   padding: 0;
   overflow: hidden;
@@ -184,8 +191,8 @@ h1 {
 }
 
 .notify-button {
-  width: auto;
-  min-height: 48px;
+  inline-size: auto;
+  min-block-size: 48px;
   padding: 0 16px;
   color: var(--color-text);
   background: var(--color-control-strong);
@@ -193,7 +200,7 @@ h1 {
 }
 
 .notify-status {
-  min-height: 24px;
+  min-block-size: 24px;
   margin: 10px 0 0;
   color: var(--color-muted);
   font-size: 16px;
@@ -223,7 +230,7 @@ h1 {
 }
 
 .clear-button {
-  min-height: 44px;
+  min-block-size: 44px;
   padding: 9px 14px;
   color: var(--color-muted);
   background: var(--color-control);
@@ -261,7 +268,7 @@ h1 {
 
 .item-days {
   align-self: center;
-  min-width: 88px;
+  min-inline-size: 88px;
   padding: 10px 12px;
   border-radius: var(--radius);
   color: var(--color-text);
@@ -271,8 +278,8 @@ h1 {
 }
 
 .delete-button {
-  width: 42px;
-  height: 42px;
+  inline-size: 42px;
+  block-size: 42px;
   border: 0;
   border-radius: var(--radius);
   color: var(--color-danger-text);
@@ -307,14 +314,14 @@ h1 {
 
   .examples-button,
   .notify-button {
-    width: 100%;
+    inline-size: 100%;
   }
 
   .item-days {
-    width: 100%;
+    inline-size: 100%;
   }
 
   .delete-button {
-    width: 100%;
+    inline-size: 100%;
   }
 }
