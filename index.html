@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Сроки</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="hero">
+        <h1>Скажи и забудь</h1>
+        <div class="hero-actions">
+          <button class="notify-button" type="button">
+            Настроить уведомления
+          </button>
+          <button class="examples-button" type="button" aria-expanded="false">
+            Примеры
+          </button>
+        </div>
+        <div class="examples-panel" hidden>
+          <p>Молоко до 5 июня</p>
+          <p>Паспорт до марта следующего года</p>
+          <p>Звонок маме сегодня в 8 вечера</p>
+          <p>Таблетка через 30 минут</p>
+          <p>Стрижка через месяц</p>
+          <p class="examples-note">
+            Через 10 секунд запись завершится сама. Чтобы закончить раньше, скажи:
+            “Готово”.
+          </p>
+        </div>
+        <p class="notify-status" aria-live="polite"></p>
+      </section>
+
+      <section class="capture" aria-label="Добавить срок">
+        <p class="start-hint">Нажми старт и скажи</p>
+        <button class="start-button" type="button">
+          <span class="start-icon">●</span>
+          <span class="start-text">Старт</span>
+        </button>
+
+        <div class="phrase-form">
+          <input
+            class="phrase-input"
+            type="text"
+            autocomplete="off"
+            readonly
+            aria-hidden="true"
+            tabindex="-1"
+            placeholder=""
+          />
+        </div>
+
+        <p class="status" aria-live="polite"></p>
+        <p class="sr-status" aria-live="polite"></p>
+      </section>
+
+      <section class="timeline">
+        <div class="timeline-head">
+          <h2>Ближайшие сроки</h2>
+          <button class="clear-button" type="button">Очистить все</button>
+        </div>
+        <ul class="list"></ul>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
