@@ -162,6 +162,7 @@ const weekdayMap = {
 let items = [];
 let recognition = null;
 let statusTimer = null;
+let notifyStatusTimer = null;
 let phraseTimer = null;
 let restartTimer = null;
 let startClickTimer = null;
@@ -1062,12 +1063,18 @@ function showNotifyStatus(message) {
     return;
   }
 
+  clearTimeout(notifyStatusTimer);
   notifyStatus.classList.remove("is-visible");
   notifyStatus.textContent = message;
 
   requestAnimationFrame(() => {
     notifyStatus.classList.add("is-visible");
   });
+
+  notifyStatusTimer = setTimeout(() => {
+    notifyStatus.classList.remove("is-visible");
+    notifyStatus.textContent = "";
+  }, SHORT_MESSAGE_VISIBLE_MS);
 }
 
 function speakError(value, reason = "") {
