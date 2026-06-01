@@ -16,7 +16,7 @@
 }
 
 .hero {
-  padding: 10px 0 14px;
+  padding: 10px 0 8px;
 }
 
 .eyebrow {
@@ -43,7 +43,7 @@ h1 {
 
 .capture,
 .timeline {
-  margin-top: 8px;
+  margin-top: 4px;
   padding: 16px;
   background: var(--color-surface);
   border: 2px solid var(--color-border);
@@ -152,26 +152,27 @@ h1 {
 .phrase-input {
   inline-size: 100%;
   min-inline-size: 0;
-  min-block-size: 48px;
-  padding: 12px 14px;
-  border: 1px solid transparent;
+  min-block-size: 58px;
+  padding: 15px 14px;
+  border: 2px solid var(--color-border-strong);
   border-radius: var(--radius);
   outline: none;
   color: var(--color-text);
-  background: transparent;
-  font-size: 18px;
-  opacity: 0;
+  background: var(--color-soft);
+  font-size: 20px;
   pointer-events: none;
   transition:
-    opacity 180ms ease,
     border-color 180ms ease,
     background-color 180ms ease;
 }
 
 .phrase-input.has-value {
-  border-color: var(--color-border);
-  background: var(--color-soft);
-  opacity: 1;
+  border-color: var(--color-primary);
+}
+
+.phrase-input:focus-visible {
+  outline: 2px solid #b8d3c2;
+  outline-offset: 2px;
 }
 
 .clear-button,
@@ -327,12 +328,12 @@ h1 {
   }
 
   .hero {
-    padding-bottom: 8px;
+    padding-bottom: 4px;
   }
 
   .capture,
   .timeline {
-    margin-top: 6px;
+    margin-top: 3px;
     padding: 14px;
   }
 

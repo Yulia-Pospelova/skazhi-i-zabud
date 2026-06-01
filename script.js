@@ -263,8 +263,6 @@ function clearStartPress() {
 }
 
 function startSingleListening() {
-  phraseInput.focus();
-
   if (!recognition) {
     showStatus("Скажи или напиши одной фразой: страховка до 15 июля");
     return;
@@ -351,8 +349,6 @@ function isStopPhrase(value) {
 }
 
 function startSeriesListening() {
-  phraseInput.focus();
-
   if (!recognition) {
     showStatus("Скажи или напиши одной фразой: страховка до 15 июля");
     return;
@@ -1226,6 +1222,10 @@ function showRecognizedPhrase(phrase) {
 function clearPhraseInput() {
   phraseInput.value = "";
   phraseInput.classList.remove("has-value");
+
+  if (document.activeElement === phraseInput) {
+    phraseInput.blur();
+  }
 }
 
 function scheduleItemNotifications(item) {
