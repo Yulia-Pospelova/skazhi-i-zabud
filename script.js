@@ -1,19 +1,22 @@
-const startButton = document.querySelector(".start-button");
-const phraseInput = document.querySelector(".phrase-input");
-const statusText = document.querySelector(".status");
-const srStatus = document.querySelector(".sr-status");
-const notifyButton = document.querySelector(".notify-button");
-const notifyStatus = document.querySelector(".notify-status");
-const examplesButton = document.querySelector(".examples-button");
-const examplesPanel = document.querySelector(".examples-panel");
-const clearButton = document.querySelector(".clear-button");
-const list = document.querySelector(".list");
+let startButton = null;
+let phraseInput = null;
+let statusText = null;
+let srStatus = null;
+let notifyButton = null;
+let notifyStatus = null;
+let examplesButton = null;
+let examplesPanel = null;
+let clearButton = null;
+let list = null;
 
 const STORAGE_KEY = "expiry-reminders";
 const MESSAGE_VISIBLE_MS = 4000;
 const SHORT_MESSAGE_VISIBLE_MS = 2200;
-const SERIES_LISTEN_MS = 10000;
+const SINGLE_CLICK_DELAY_MS = 420;
+const LONG_PRESS_DELAY_MS = 800;
 const ERROR_SPEAK_COOLDOWN_MS = 2500;
+const ERROR_REPEAT_MESSAGE_COOLDOWN_MS = 4500;
+const SPECIFIC_ERROR_COOLDOWN_MS = 5000;
 const MAX_LOCAL_TIMER_MS = 2147483647;
 const stopPhrases = ["готово"];
 const reminderRules = [
@@ -37,61 +40,228 @@ const monthNames = [
 ];
 const monthMap = {
   январь: 0,
+  январе: 0,
   января: 0,
   феврале: 1,
   февраль: 1,
   февраля: 1,
   март: 2,
+  марте: 2,
   марта: 2,
   апрель: 3,
+  апреле: 3,
   апреля: 3,
   май: 4,
+  мае: 4,
   мая: 4,
   июнь: 5,
+  июне: 5,
   июня: 5,
   июль: 6,
+  июле: 6,
   июля: 6,
   август: 7,
+  августе: 7,
   августа: 7,
   сентябрь: 8,
+  сентябре: 8,
   сентября: 8,
   октябрь: 9,
+  октябре: 9,
   октября: 9,
   ноябрь: 10,
+  ноябре: 10,
   ноября: 10,
   декабрь: 11,
+  декабре: 11,
   декабря: 11,
 };
+const dayWordMap = {
+  первого: 1,
+  второе: 2,
+  второго: 2,
+  третье: 3,
+  третьего: 3,
+  четвертое: 4,
+  четвертого: 4,
+  пятое: 5,
+  пятого: 5,
+  шестое: 6,
+  шестого: 6,
+  седьмое: 7,
+  седьмого: 7,
+  восьмое: 8,
+  восьмого: 8,
+  девятое: 9,
+  девятого: 9,
+  десятое: 10,
+  десятого: 10,
+  одиннадцатое: 11,
+  одиннадцатого: 11,
+  двенадцатое: 12,
+  двенадцатого: 12,
+  тринадцатое: 13,
+  тринадцатого: 13,
+  четырнадцатое: 14,
+  четырнадцатого: 14,
+  пятнадцатое: 15,
+  пятнадцатого: 15,
+  шестнадцатое: 16,
+  шестнадцатого: 16,
+  семнадцатое: 17,
+  семнадцатого: 17,
+  восемнадцатое: 18,
+  восемнадцатого: 18,
+  девятнадцатое: 19,
+  девятнадцатого: 19,
+  двадцатое: 20,
+  двадцатого: 20,
+  "двадцать первое": 21,
+  "двадцать первого": 21,
+  "двадцать второе": 22,
+  "двадцать второго": 22,
+  "двадцать третье": 23,
+  "двадцать третьего": 23,
+  "двадцать четвертое": 24,
+  "двадцать четвертого": 24,
+  "двадцать пятое": 25,
+  "двадцать пятого": 25,
+  "двадцать шестое": 26,
+  "двадцать шестого": 26,
+  "двадцать седьмое": 27,
+  "двадцать седьмого": 27,
+  "двадцать восьмое": 28,
+  "двадцать восьмого": 28,
+  "двадцать девятое": 29,
+  "двадцать девятого": 29,
+  тридцатое: 30,
+  тридцатого: 30,
+  "тридцать первое": 31,
+  "тридцать первого": 31,
+};
+const weekdayMap = {
+  понедельник: 1,
+  понедельника: 1,
+  вторник: 2,
+  вторника: 2,
+  среду: 3,
+  среда: 3,
+  среды: 3,
+  четверг: 4,
+  четверга: 4,
+  пятницу: 5,
+  пятница: 5,
+  пятницы: 5,
+  субботу: 6,
+  суббота: 6,
+  субботы: 6,
+  воскресенье: 0,
+  воскресенья: 0,
+};
 
-let items = loadItems();
+let items = [];
 let recognition = null;
 let statusTimer = null;
 let phraseTimer = null;
-let seriesTimer = null;
 let restartTimer = null;
+let startClickTimer = null;
+let longPressTimer = null;
+let isLongPress = false;
 let notificationTimers = [];
 let isSeriesActive = false;
 let lastErrorSpokenAt = 0;
 let lastErrorPhrase = "";
+let lastErrorMessage = "";
+let lastSpecificErrorAt = 0;
 let audioContext = null;
+let lastParseError = "";
 
-removeExpiredItems();
-renderList();
-setupSpeech();
-scheduleAllNotifications();
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initApp);
+} else {
+  initApp();
+}
 
-startButton.addEventListener("click", handleStart);
-notifyButton.addEventListener("click", requestNotificationPermission);
-examplesButton.addEventListener("click", toggleExamples);
+function initApp() {
+  try {
+    assignElements();
+    items = loadItems();
+    removeExpiredItems();
+    if (list) {
+      renderList();
+    }
+    setupSpeech();
+    scheduleAllNotifications();
 
-clearButton.addEventListener("click", () => {
-  items = [];
-  saveItems();
-  renderList();
-  showStatus("Список очищен", SHORT_MESSAGE_VISIBLE_MS);
-});
+    if (startButton) {
+      startButton.addEventListener("click", handleStartClick);
+      startButton.addEventListener("pointerdown", handleStartPress);
+      startButton.addEventListener("pointerup", clearStartPress);
+      startButton.addEventListener("pointerleave", clearStartPress);
+      startButton.addEventListener("pointercancel", clearStartPress);
+    }
 
-function handleStart() {
+    if (notifyButton) {
+      notifyButton.addEventListener("click", requestNotificationPermission);
+    }
+
+    if (examplesButton) {
+      examplesButton.addEventListener("click", toggleExamples);
+    }
+
+    if (clearButton) {
+      clearButton.addEventListener("click", () => {
+        items = [];
+        saveItems();
+        renderList();
+        showStatus("Список очищен", SHORT_MESSAGE_VISIBLE_MS);
+      });
+    }
+  } catch (error) {
+    console.error("App init failed", error);
+  }
+}
+
+function assignElements() {
+  startButton = document.querySelector(".start-button");
+  phraseInput = document.querySelector(".phrase-input");
+  statusText = document.querySelector(".status");
+  srStatus = document.querySelector(".sr-status");
+  notifyButton = document.querySelector(".notify-button");
+  notifyStatus = document.querySelector(".notify-status");
+  examplesButton = document.querySelector(".examples-button");
+  examplesPanel = document.querySelector(".examples-panel");
+  clearButton = document.querySelector(".clear-button");
+  list = document.querySelector(".list");
+}
+
+function handleStartClick(event) {
+  clearTimeout(startClickTimer);
+
+  if (isLongPress) {
+    isLongPress = false;
+    return;
+  }
+
+  startClickTimer = setTimeout(startSingleListening, SINGLE_CLICK_DELAY_MS);
+}
+
+function handleStartPress() {
+  clearTimeout(longPressTimer);
+  isLongPress = false;
+
+  longPressTimer = setTimeout(() => {
+    isLongPress = true;
+    clearTimeout(startClickTimer);
+    startSeriesListening();
+  }, LONG_PRESS_DELAY_MS);
+}
+
+function clearStartPress() {
+  clearTimeout(longPressTimer);
+}
+
+function startSingleListening() {
   phraseInput.focus();
 
   if (!recognition) {
@@ -99,10 +269,18 @@ function handleStart() {
     return;
   }
 
-  startSeriesListening();
+  isSeriesActive = false;
+  startButton.classList.add("is-listening");
+  showStatus("Слушаю.");
+  lastErrorPhrase = "";
+  startRecognition();
 }
 
 function toggleExamples() {
+  if (!examplesPanel || !examplesButton) {
+    return;
+  }
+
   const isOpen = !examplesPanel.hidden;
   examplesPanel.hidden = isOpen;
   examplesButton.setAttribute("aria-expanded", String(!isOpen));
@@ -121,7 +299,7 @@ function handlePhrase(value, options = {}) {
   if (!parsed || parsed.name === "Предмет") {
     if (options.fromSpeech) {
       hideStatus();
-      speakError(value);
+      speakError(value, lastParseError);
     } else {
       showStatus("Не получилось разобрать срок. Пример: молоко до 5 июня");
       clearPhraseSoon();
@@ -131,7 +309,7 @@ function handlePhrase(value, options = {}) {
 
   if (hasDuplicateItem(parsed)) {
     playSavedSound();
-    showStatus("Такая запись уже есть. Можно сказать еще.");
+    showStatus(isSeriesActive ? "Такая запись уже есть. Можно сказать еще." : "Такая запись уже есть.");
     clearPhraseSoon();
     return true;
   }
@@ -143,7 +321,11 @@ function handlePhrase(value, options = {}) {
   lastErrorPhrase = "";
 
   playSavedSound();
-  showStatus(`Сохранено. ${formatReminderMessage(parsed)} Можно сказать еще.`);
+  showStatus(
+    isSeriesActive
+      ? `Сохранено. ${formatReminderMessage(parsed)} Можно сказать еще.`
+      : `Сохранено. ${formatReminderMessage(parsed)}`,
+  );
   clearPhraseSoon();
   scheduleItemNotifications(parsed);
   return true;
@@ -168,22 +350,22 @@ function isStopPhrase(value) {
 }
 
 function startSeriesListening() {
+  phraseInput.focus();
+
+  if (!recognition) {
+    showStatus("Скажи или напиши одной фразой: страховка до 15 июля");
+    return;
+  }
+
   isSeriesActive = true;
   startButton.classList.add("is-listening");
   showStatus("Слушаю. Можно сказать несколько фраз.");
   lastErrorPhrase = "";
-  armSeriesTimeout();
   startRecognition();
-}
-
-function armSeriesTimeout() {
-  clearTimeout(seriesTimer);
-  seriesTimer = setTimeout(stopSeriesListening, SERIES_LISTEN_MS);
 }
 
 function stopSeriesListening() {
   isSeriesActive = false;
-  clearTimeout(seriesTimer);
   clearTimeout(restartTimer);
   startButton.classList.remove("is-listening");
 
@@ -203,6 +385,7 @@ function startRecognition() {
 }
 
 function parsePhrase(value) {
+  lastParseError = "";
   const phrase = normalize(value);
 
   if (!phrase) {
@@ -223,6 +406,28 @@ function parsePhrase(value) {
   }
 
   const parsedTime = time || getTimeFromRelative(relative);
+  const approximate = parseApproximateDate(phrase);
+  if (approximate) {
+    return {
+      id: createId(),
+      name: getParsedName(phrase.slice(0, approximate.index)),
+      date: toIsoDate(approximate.date),
+      time: parsedTime,
+      source: value.trim(),
+    };
+  }
+
+  const weekday = parseWeekdayDate(phrase);
+  if (weekday) {
+    return {
+      id: createId(),
+      name: getParsedName(phrase.slice(0, weekday.index)),
+      date: toIsoDate(weekday.date),
+      time: parsedTime,
+      source: value.trim(),
+    };
+  }
+
   const exact = parseExactDate(phrase, relative);
   if (exact) {
     const name = getParsedName(phrase.slice(0, exact.index));
@@ -265,6 +470,12 @@ function parsePhrase(value) {
 }
 
 function parseRelativeDate(phrase) {
+  const halfYear = parseHalfYearDate(phrase);
+
+  if (halfYear) {
+    return halfYear;
+  }
+
   const match = phrase.match(
     /(?:^|\s)через\s+(минуту|час|день|неделю|месяц|год|(\d+)\s*(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет))/,
   );
@@ -292,6 +503,19 @@ function parseRelativeDate(phrase) {
   }
 
   return { date, index: match.index, unit: getRelativeUnit(unit) };
+}
+
+function parseHalfYearDate(phrase) {
+  const match = phrase.match(/(?:^|\s)через\s+(полгода|пол\s+года|полгоду)/);
+
+  if (!match) {
+    return null;
+  }
+
+  const date = new Date();
+  date.setMonth(date.getMonth() + 6);
+
+  return { date, index: match.index, unit: "month" };
 }
 
 function parseYearOnlyDate(phrase) {
@@ -353,9 +577,137 @@ function parseNamedDate(phrase) {
   return { date, index: match.index };
 }
 
+function parseApproximateDate(phrase) {
+  return (
+    parseNextYearDate(phrase) ||
+    parseYearPartDate(phrase) ||
+    parseNextMonthDate(phrase) ||
+    parseMonthPartDate(phrase)
+  );
+}
+
+function parseNextYearDate(phrase) {
+  const match = phrase.match(/(?:^|\s)в\s+следующ(?:ем|ий)\s+год(?:у)?/);
+
+  if (!match) {
+    return null;
+  }
+
+  return { date: new Date(new Date().getFullYear() + 1, 0, 1), index: match.index };
+}
+
+function parseYearPartDate(phrase) {
+  const match = phrase.match(/(?:^|\s)в\s+(начале|середине|конце)\s+(следующего\s+)?года/);
+
+  if (!match) {
+    return null;
+  }
+
+  const now = new Date();
+  let month = 0;
+  let day = 1;
+
+  if (match[1] === "середине") {
+    month = 6;
+    day = 15;
+  }
+
+  if (match[1] === "конце") {
+    month = 11;
+    day = 1;
+  }
+
+  let date = new Date(now.getFullYear() + (match[2] ? 1 : 0), month, day);
+
+  if (!match[2] && date < startOfToday()) {
+    date = new Date(now.getFullYear() + 1, month, day);
+  }
+
+  return { date, index: match.index };
+}
+
+function parseNextMonthDate(phrase) {
+  const match = phrase.match(/(?:^|\s)в\s+следующ(?:ем|ий)\s+месяц(?:е)?/);
+
+  if (!match) {
+    return null;
+  }
+
+  const now = new Date();
+  return { date: new Date(now.getFullYear(), now.getMonth() + 1, 1), index: match.index };
+}
+
+function parseMonthPartDate(phrase) {
+  const monthWords = Object.keys(monthMap).join("|");
+  const regex = new RegExp(
+    `(?:^|\\s)в\\s+(?:(начале|середине|конце)\\s+)?(${monthWords})`,
+  );
+  const match = regex.exec(phrase);
+
+  if (!match) {
+    return null;
+  }
+
+  const month = monthMap[match[2]];
+  const now = new Date();
+  let year = getPhraseYearHint(phrase) || now.getFullYear();
+  const day = getApproximateMonthDay(match[1], month, year);
+  let date = new Date(year, month, day);
+
+  if (!getPhraseYearHint(phrase) && date < startOfToday()) {
+    year += 1;
+    date = new Date(year, month, getApproximateMonthDay(match[1], month, year));
+  }
+
+  return { date, index: match.index };
+}
+
+function getApproximateMonthDay(part, month, year) {
+  if (part === "середине") {
+    return 15;
+  }
+
+  if (part === "конце") {
+    return lastDayOfMonth(month, year);
+  }
+
+  return 1;
+}
+
+function parseWeekdayDate(phrase) {
+  const regex = /(?:^|\s)(?:в\s+)?(?:(следующий|следующая|следующее|следующей)\s+)?([а-яё]+)/g;
+  let match = regex.exec(phrase);
+
+  while (match) {
+    const weekday = weekdayMap[match[2]];
+
+    if (weekday !== undefined) {
+      const date = getWeekdayDate(weekday, Boolean(match[1]));
+      return { date, index: match.index };
+    }
+
+    match = regex.exec(phrase);
+  }
+
+  return null;
+}
+
+function getWeekdayDate(weekday, isNextWeek) {
+  const date = startOfToday();
+  const today = date.getDay();
+  let daysToAdd = (weekday - today + 7) % 7;
+
+  if (daysToAdd === 0 || isNextWeek) {
+    daysToAdd += 7;
+  }
+
+  date.setDate(date.getDate() + daysToAdd);
+  return date;
+}
+
 function parseTime(phrase) {
   const match = phrase.match(
-    /(?:^|\s)(?:в|на)\s+(\d{1,2})(?::(\d{2}))?\s*(утра|вечера|дня|ночи)?/,
+    /(?:^|\s)(?:в|на)\s+(\d{1,2})(?::(\d{2})|\s*(?:часа?|часов)(?:\s*(?:и\s*)?(\d{1,2})\s*(?:минут|минуты|минута))?)?\s*(утра|вечера|дня|ночи)?/,
   );
 
   if (!match) {
@@ -363,8 +715,8 @@ function parseTime(phrase) {
   }
 
   let hour = Number(match[1]);
-  const minute = match[2] ? Number(match[2]) : 0;
-  const dayPart = match[3];
+  const minute = Number(match[2] || match[3] || 0);
+  const dayPart = match[4];
 
   if (dayPart === "вечера" || dayPart === "дня") {
     if (hour < 12) {
@@ -386,12 +738,17 @@ function parseTime(phrase) {
 }
 
 function parseExactDate(phrase, relative) {
-  const matches = phrase.matchAll(
-    /(?:^|\s)(до\s+)?(?:(\d{1,2})\s*)?([а-яё]+)(?:\s+((?:\d{4})|(?:следующего|следующий)\s+года?))?/g,
-  );
-  let match = null;
+  const spokenDate = parseSpokenExactDate(phrase, relative);
 
-  for (const currentMatch of matches) {
+  if (spokenDate) {
+    return spokenDate;
+  }
+
+  const regex = /(?:^|\s)(до\s+)?(?:(\d{1,2})\s*)?([а-яё]+)(?:\s+((?:\d{4})|(?:следующего|следующий)\s+года?))?/g;
+  let match = null;
+  let currentMatch = regex.exec(phrase);
+
+  while (currentMatch) {
     const hasDateSignal = Boolean(currentMatch[1] || currentMatch[2]);
     const hasKnownMonth = monthMap[currentMatch[3]] !== undefined;
 
@@ -399,6 +756,8 @@ function parseExactDate(phrase, relative) {
       match = currentMatch;
       break;
     }
+
+    currentMatch = regex.exec(phrase);
   }
 
   if (!match) {
@@ -419,6 +778,7 @@ function parseExactDate(phrase, relative) {
     getPhraseYearHint(phrase) ||
     getRelativeYear(relative) ||
     now.getFullYear();
+
   let date = new Date(year, month, day);
 
   if (!match[4] && !getRelativeYear(relative) && date < startOfToday()) {
@@ -426,7 +786,59 @@ function parseExactDate(phrase, relative) {
     date = new Date(year, month, day);
   }
 
+  if (!isValidMonthDay(day, month, year)) {
+    setInvalidDateError(day, month);
+    return null;
+  }
+
   return { date, index: match.index };
+}
+
+function parseSpokenExactDate(phrase, relative) {
+  const dayWords = Object.keys(dayWordMap).sort((a, b) => b.length - a.length).join("|");
+  const monthWords = Object.keys(monthMap).join("|");
+  const regex = new RegExp(
+    `(?:^|\\s)(до\\s+)?(${dayWords})\\s+(${monthWords})(?:\\s+((?:\\d{4})|(?:следующего|следующий)\\s+года?))?`,
+    "g",
+  );
+  const match = regex.exec(phrase);
+
+  if (!match) {
+    return null;
+  }
+
+  const day = dayWordMap[match[2]];
+  const month = monthMap[match[3]];
+  const now = new Date();
+  let year =
+    getExplicitYear(match[4]) ||
+    getPhraseYearHint(phrase) ||
+    getRelativeYear(relative) ||
+    now.getFullYear();
+
+  let date = new Date(year, month, day);
+
+  if (!match[4] && !getRelativeYear(relative) && date < startOfToday()) {
+    year += 1;
+    date = new Date(year, month, day);
+  }
+
+  if (!isValidMonthDay(day, month, year)) {
+    setInvalidDateError(day, month);
+    return null;
+  }
+
+  return { date, index: match.index };
+}
+
+function isValidMonthDay(day, month, year) {
+  return day >= 1 && day <= lastDayOfMonth(month, year);
+}
+
+function setInvalidDateError(day, month) {
+  lastParseError = day === 29 && month === 1
+    ? "invalid-leap-day"
+    : "invalid-month-day";
 }
 
 function getExplicitYear(value) {
@@ -480,8 +892,14 @@ function cleanName(name) {
     name
       .replace(/\bсрок\b/g, "")
       .replace(/\bпредмет\b/g, "")
+      .replace(/через\s+(полгода|пол\s+года|полгоду)/g, "")
       .replace(/через\s+(минуту|час|день|неделю|месяц|год|(\d+)\s*(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет))/g, "")
-      .replace(/\b(?:в|на)\s+\d{1,2}(?::\d{2})?\s*(утра|вечера|дня|ночи)?/g, "")
+      .replace(/\bв\s+следующ(?:ем|ий)\s+год(?:у)?/g, "")
+      .replace(/\bв\s+(начале|середине|конце)\s+(следующего\s+)?года/g, "")
+      .replace(/\bв\s+следующ(?:ем|ий)\s+месяц(?:е)?/g, "")
+      .replace(/\bв\s+(?:(начале|середине|конце)\s+)?(январь|январе|января|феврале|февраль|февраля|март|марте|марта|апрель|апреле|апреля|май|мае|мая|июнь|июне|июня|июль|июле|июля|август|августе|августа|сентябрь|сентябре|сентября|октябрь|октябре|октября|ноябрь|ноябре|ноября|декабрь|декабре|декабря)/g, "")
+      .replace(/\b(?:в|на)\s+\d{1,2}(?::\d{2}|\s*(?:часа?|часов)(?:\s*(?:и\s*)?\d{1,2}\s*(?:минут|минуты|минута))?)?\s*(утра|вечера|дня|ночи)?/g, "")
+      .replace(/(?:в\s+)?(?:следующий|следующая|следующее|следующей)?\s*(понедельник|понедельника|вторник|вторника|среду|среда|среды|четверг|четверга|пятницу|пятница|пятницы|субботу|суббота|субботы|воскресенье|воскресенья)/g, "")
       .replace(/[.,!?]+/g, "")
       .trim()
       .replace(/^./, (letter) => letter.toUpperCase()) || "Предмет"
@@ -574,8 +992,8 @@ function setupSpeech() {
       srStatus.textContent = `Распознано: ${phrase}`;
     }
 
-    if (isSeriesActive && result !== "stopped") {
-      armSeriesTimeout();
+    if (!isSeriesActive && result !== false) {
+      stopSeriesListening();
     }
   });
 
@@ -639,6 +1057,11 @@ function hideStatus() {
 }
 
 function showNotifyStatus(message) {
+  if (!notifyStatus) {
+    showStatus(message);
+    return;
+  }
+
   notifyStatus.classList.remove("is-visible");
   notifyStatus.textContent = message;
 
@@ -647,21 +1070,48 @@ function showNotifyStatus(message) {
   });
 }
 
-function speakError(value) {
+function speakError(value, reason = "") {
   const now = Date.now();
   const phrase = normalize(value);
+  const message = getErrorMessage(reason);
 
-  if (phrase && phrase === lastErrorPhrase) {
+  if (!reason && now - lastSpecificErrorAt < SPECIFIC_ERROR_COOLDOWN_MS) {
     return;
   }
 
-  if (now - lastErrorSpokenAt < ERROR_SPEAK_COOLDOWN_MS) {
+  if (message === lastErrorMessage && now - lastErrorSpokenAt < ERROR_REPEAT_MESSAGE_COOLDOWN_MS) {
+    return;
+  }
+
+  if (phrase && phrase === lastErrorPhrase && !reason) {
+    return;
+  }
+
+  if (!reason && now - lastErrorSpokenAt < ERROR_SPEAK_COOLDOWN_MS) {
     return;
   }
 
   lastErrorSpokenAt = now;
   lastErrorPhrase = phrase;
-  speak("Не разобрала, повторите");
+  lastErrorMessage = message;
+
+  if (reason) {
+    lastSpecificErrorAt = now;
+  }
+
+  speak(message);
+}
+
+function getErrorMessage(reason) {
+  if (reason === "invalid-leap-day") {
+    return "Нет такой даты в этом году";
+  }
+
+  if (reason === "invalid-month-day") {
+    return "Нет такой даты в этом месяце";
+  }
+
+  return "Не разобрала, повторите";
 }
 
 function speak(message) {
@@ -748,9 +1198,13 @@ function scheduleItemNotifications(item) {
     return;
   }
 
-  getNotificationTimes(item).forEach((notificationTime) => {
-    scheduleNotification(item, notificationTime);
-  });
+  try {
+    getNotificationTimes(item).forEach((notificationTime) => {
+      scheduleNotification(item, notificationTime);
+    });
+  } catch (error) {
+    // Ignore invalid stored reminders so the interface keeps working.
+  }
 }
 
 function scheduleAllNotifications() {
@@ -875,7 +1329,7 @@ function formatDaysLeft(value) {
     return "сегодня";
   }
 
-  if (days >= 365) {
+  if (days >= 30) {
     return formatLongDaysLeft(days);
   }
 
@@ -884,14 +1338,24 @@ function formatDaysLeft(value) {
 
 function formatLongDaysLeft(days) {
   const years = Math.floor(days / 365);
-  const restDays = days % 365;
-  const yearText = `${years} ${getYearWord(years)}`;
+  const daysAfterYears = days % 365;
+  const months = Math.floor(daysAfterYears / 30);
+  const restDays = daysAfterYears % 30;
+  const parts = [];
 
-  if (!restDays) {
-    return yearText;
+  if (years) {
+    parts.push(`${years} ${getYearWord(years)}`);
   }
 
-  return `${yearText} ${restDays} дн.`;
+  if (months) {
+    parts.push(`${months} ${getMonthWord(months)}`);
+  }
+
+  if (restDays) {
+    parts.push(`${restDays} дн.`);
+  }
+
+  return parts.join(" ");
 }
 
 function getYearWord(value) {
@@ -911,6 +1375,25 @@ function getYearWord(value) {
   }
 
   return "лет";
+}
+
+function getMonthWord(value) {
+  const lastTwoDigits = value % 100;
+  const lastDigit = value % 10;
+
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+    return "месяцев";
+  }
+
+  if (lastDigit === 1) {
+    return "месяц";
+  }
+
+  if (lastDigit >= 2 && lastDigit <= 4) {
+    return "месяца";
+  }
+
+  return "месяцев";
 }
 
 function getReminderPlan(value) {
@@ -998,18 +1481,37 @@ function parseItemDateTime(item) {
 }
 
 function loadItems() {
-  const storedItems = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
-  const itemsWithIds = storedItems.map((item) => {
-    const migratedItem = migrateStoredItem(item);
+  let storedItems = [];
 
-    return {
-      ...migratedItem,
-      id: item.id || migratedItem.id || createId(),
-    };
-  });
+  try {
+    storedItems = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  } catch (error) {
+    storedItems = [];
+  }
+
+  const itemsWithIds = storedItems
+    .filter(isValidStoredItem)
+    .map((item) => {
+      const migratedItem = migrateStoredItem(item);
+
+      return {
+        ...migratedItem,
+        id: item.id || migratedItem.id || createId(),
+      };
+    });
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(itemsWithIds));
   return itemsWithIds;
+}
+
+function isValidStoredItem(item) {
+  return Boolean(
+    item &&
+    typeof item === "object" &&
+    typeof item.name === "string" &&
+    typeof item.date === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(item.date),
+  );
 }
 
 function migrateStoredItem(item) {
