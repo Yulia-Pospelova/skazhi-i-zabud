@@ -289,7 +289,7 @@ function toggleExamples() {
 
 function handlePhrase(value, options = {}) {
   if (isStopPhrase(value)) {
-    phraseInput.value = "";
+    clearPhraseInput();
     stopSeriesListening();
     hideStatus();
     return "stopped";
@@ -989,7 +989,7 @@ function setupSpeech() {
     const result = handlePhrase(phrase, { fromSpeech: true });
 
     if (result !== false) {
-      phraseInput.value = phrase;
+      showRecognizedPhrase(phrase);
       srStatus.textContent = `Распознано: ${phrase}`;
     }
 
@@ -1104,6 +1104,7 @@ function speakError(value, reason = "") {
 
   if (reason) {
     lastSpecificErrorAt = now;
+    showStatus(message);
   }
 
   speak(message);
@@ -1130,8 +1131,15 @@ function speak(message) {
   utterance.lang = "ru-RU";
   utterance.rate = 0.95;
 
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
+  try {
+    window.speechSynthesis.cancel();
+  } catch (error) {
+    // Some mobile browsers do not like canceling immediately after recognition.
+  }
+
+  setTimeout(() => {
+    window.speechSynthesis.speak(utterance);
+  }, 120);
 }
 
 function playSavedSound() {
@@ -1196,8 +1204,18 @@ function clearPhraseSoon() {
   clearTimeout(phraseTimer);
 
   phraseTimer = setTimeout(() => {
-    phraseInput.value = "";
+    clearPhraseInput();
   }, MESSAGE_VISIBLE_MS);
+}
+
+function showRecognizedPhrase(phrase) {
+  phraseInput.value = phrase;
+  phraseInput.classList.add("has-value");
+}
+
+function clearPhraseInput() {
+  phraseInput.value = "";
+  phraseInput.classList.remove("has-value");
 }
 
 function scheduleItemNotifications(item) {

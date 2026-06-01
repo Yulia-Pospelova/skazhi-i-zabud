@@ -61,6 +61,14 @@ h1 {
   color: var(--color-surface);
   background: var(--color-primary);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.start-button:active {
+  transform: none;
 }
 
 .hero-actions {
@@ -144,15 +152,26 @@ h1 {
 .phrase-input {
   inline-size: 100%;
   min-inline-size: 0;
-  min-block-size: 58px;
-  padding: 15px 14px;
-  border: 2px solid var(--color-border-strong);
+  min-block-size: 48px;
+  padding: 12px 14px;
+  border: 1px solid transparent;
   border-radius: var(--radius);
   outline: none;
   color: var(--color-text);
-  background: var(--color-soft);
-  font-size: 20px;
+  background: transparent;
+  font-size: 18px;
+  opacity: 0;
   pointer-events: none;
+  transition:
+    opacity 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease;
+}
+
+.phrase-input.has-value {
+  border-color: var(--color-border);
+  background: var(--color-soft);
+  opacity: 1;
 }
 
 .clear-button,
