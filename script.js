@@ -205,6 +205,7 @@ const weekdayMap = {
 let items = [];
 let recognition = null;
 let statusTimer = null;
+let srStatusTimer = null;
 let notifyStatusTimer = null;
 let phraseTimer = null;
 let restartTimer = null;
@@ -399,7 +400,7 @@ function handleEditPhrase(value) {
     finishEditing();
     showStatus("Удалено", SHORT_MESSAGE_VISIBLE_MS);
     clearPhraseSoon();
-    return true;
+    return "silent";
   }
 
   const renamedItem = getRenamedItem(item, phrase);
@@ -430,7 +431,7 @@ function handleEditPhrase(value) {
 }
 
 function getRenamedItem(item, phrase) {
-  const match = phrase.match(/(?:^|\s)(?:измени|исправь|поменяй)\s+название\s+на\s+(.+)$/);
+  const match = phrase.match(/(?:^|\s)(?:измени|изменить|исправь|исправить|поменяй|поменять)\s+название\s+на\s+(.+)$/);
 
   if (!match) {
     return null;
@@ -620,9 +621,17 @@ function startEditingItem(id) {
 
   editingItemId = id;
   isSeriesActive = false;
-  renderList();
+  clearEditButtonFocus(id);
   showStatus("Скажи: измени название на..., перенеси на..., исправь на..., удали");
   restartRecognition();
+}
+
+function clearEditButtonFocus(id) {
+  const button = document.querySelector(`.edit-button[data-item-id="${id}"]`);
+
+  if (button) {
+    button.blur();
+  }
 }
 
 function hasDuplicateItem(newItem) {
@@ -1312,6 +1321,8 @@ function normalize(value) {
 
 function renderList() {
   list.innerHTML = "";
+  list.setAttribute("role", "group");
+  list.setAttribute("aria-labelledby", "reminders-list-title");
 
   if (!items.length) {
     const empty = document.createElement("p");
@@ -1323,32 +1334,52 @@ function renderList() {
 
   sortByDate(items).forEach((item) => {
     const element = document.createElement("li");
-    element.className = item.id === editingItemId ? "item is-editing" : "item";
+    element.className = "item";
+    element.setAttribute("role", "none");
 
     const content = document.createElement("div");
     const actions = document.createElement("div");
     const name = document.createElement("p");
     const date = document.createElement("p");
+    const visibleDate = document.createElement("span");
+    const screenReaderDate = document.createElement("span");
     const days = document.createElement("div");
+    const visibleDays = document.createElement("span");
+    const screenReaderDays = document.createElement("span");
     const editButton = document.createElement("button");
     const deleteButton = document.createElement("button");
+    const visibleEditText = document.createElement("span");
+    const screenReaderEditText = document.createElement("span");
+    const visibleDeleteText = document.createElement("span");
+    const screenReaderDeleteText = document.createElement("span");
 
     name.className = "item-name";
     date.className = "item-date";
+    screenReaderDate.className = "visually-hidden";
     days.className = "item-days";
+    screenReaderDays.className = "visually-hidden";
     actions.className = "item-actions";
     editButton.className = "edit-button";
     deleteButton.className = "delete-button";
+    screenReaderEditText.className = "visually-hidden";
+    screenReaderDeleteText.className = "visually-hidden";
     editButton.type = "button";
     deleteButton.type = "button";
-    editButton.setAttribute("aria-label", `Исправить напоминание ${item.name}`);
-    deleteButton.setAttribute("aria-label", `Удалить напоминание ${item.name}`);
+    editButton.dataset.itemId = item.id;
 
     name.textContent = item.name;
-    date.textContent = formatDate(item.date, item.time);
-    days.textContent = formatDaysLeft(item.date);
-    editButton.textContent = "Исправить";
-    deleteButton.textContent = "Удалить";
+    visibleDate.textContent = formatDate(item.date, item.time);
+    visibleDate.setAttribute("aria-hidden", "true");
+    screenReaderDate.textContent = formatDateLabel(item.date, item.time);
+    visibleDays.textContent = formatDaysLeftVisible(item.date);
+    visibleDays.setAttribute("aria-hidden", "true");
+    screenReaderDays.textContent = formatDaysLeftLabel(item.date);
+    visibleEditText.textContent = "Исправить";
+    visibleEditText.setAttribute("aria-hidden", "true");
+    screenReaderEditText.textContent = `Исправить напоминание ${item.name}`;
+    visibleDeleteText.textContent = "Удалить";
+    visibleDeleteText.setAttribute("aria-hidden", "true");
+    screenReaderDeleteText.textContent = `Удалить напоминание ${item.name}`;
     editButton.addEventListener("click", () => {
       startEditingItem(item.id);
     });
@@ -1356,11 +1387,23 @@ function renderList() {
       deleteItem(item.id);
     });
 
+    days.append(visibleDays, screenReaderDays);
+    date.append(visibleDate, screenReaderDate);
+    editButton.append(visibleEditText, screenReaderEditText);
+    deleteButton.append(visibleDeleteText, screenReaderDeleteText);
     content.append(name, date);
     actions.append(editButton, deleteButton);
     element.append(content, days, actions);
     list.append(element);
   });
+}
+
+function getListLabel() {
+  if (!items.length) {
+    return "Список пуст.";
+  }
+
+  return "Список напоминаний.";
 }
 
 function deleteItem(id) {
@@ -1404,9 +1447,9 @@ function setupSpeech() {
       ? handleEditPhrase(phrase)
       : handlePhrase(phrase, { fromSpeech: true });
 
-    if (result !== false) {
+    if (result !== false && result !== "silent") {
       showRecognizedPhrase(phrase);
-      srStatus.textContent = `Распознано: ${phrase}`;
+      announceToScreenReader(`Распознано: ${phrase}`);
     }
 
     if (!isSeriesActive && result !== false) {
@@ -1464,7 +1507,7 @@ function showStatus(message, visibleMs = MESSAGE_VISIBLE_MS) {
   clearTimeout(statusTimer);
   statusText.classList.remove("is-visible");
   statusText.textContent = message;
-  srStatus.textContent = message;
+  announceToScreenReader(message);
 
   requestAnimationFrame(() => {
     statusText.classList.add("is-visible");
@@ -1477,9 +1520,19 @@ function showStatus(message, visibleMs = MESSAGE_VISIBLE_MS) {
 
 function hideStatus() {
   clearTimeout(statusTimer);
+  clearTimeout(srStatusTimer);
   statusText.classList.remove("is-visible");
   statusText.textContent = "";
   srStatus.textContent = "";
+}
+
+function announceToScreenReader(message) {
+  clearTimeout(srStatusTimer);
+  srStatus.textContent = message;
+
+  srStatusTimer = setTimeout(() => {
+    srStatus.textContent = "";
+  }, SHORT_MESSAGE_VISIBLE_MS);
 }
 
 function showNotifyStatus(message) {
@@ -1796,6 +1849,12 @@ function formatDate(value, time) {
   return time ? `${dateText}, ${time}` : dateText;
 }
 
+function formatDateLabel(value, time) {
+  const date = parseIsoDate(value);
+  const dateText = `${date.getDate()} ${monthNames[date.getMonth()]} ${date.getFullYear()} года`;
+  return time ? `${dateText}, ${time}` : dateText;
+}
+
 function formatDaysLeft(value) {
   const days = getDaysLeft(value);
 
@@ -1811,7 +1870,48 @@ function formatDaysLeft(value) {
     return formatLongDaysLeft(days);
   }
 
-  return `${days} дн.`;
+  return `${days} ${getDayWord(days)}`;
+}
+
+function formatDaysLeftLabel(value) {
+  const daysText = formatDaysLeft(value);
+
+  if (daysText === "сегодня") {
+    return "Срок сегодня";
+  }
+
+  if (daysText === "просрочено") {
+    return "Срок просрочен";
+  }
+
+  const spokenDaysText = formatDaysLeftSpoken(value);
+  return `${getRemainingPrefix(spokenDaysText)} ${spokenDaysText}`;
+}
+
+function formatDaysLeftVisible(value) {
+  const daysText = formatDaysLeft(value);
+
+  if (daysText === "сегодня" || daysText === "просрочено") {
+    return daysText;
+  }
+
+  return `${getRemainingPrefix(daysText)} ${daysText}`;
+}
+
+function getRemainingPrefix(value) {
+  return value.startsWith("1 день") || value.startsWith("один ")
+    ? "Остался"
+    : "Осталось";
+}
+
+function formatDaysLeftSpoken(value) {
+  const days = getDaysLeft(value);
+
+  if (days >= 30) {
+    return formatLongDaysLeftSpoken(days);
+  }
+
+  return `${getNumberWord(days)} ${getDayWord(days)}`;
 }
 
 function formatLongDaysLeft(days) {
@@ -1830,10 +1930,90 @@ function formatLongDaysLeft(days) {
   }
 
   if (restDays) {
-    parts.push(`${restDays} дн.`);
+    parts.push(`${restDays} ${getDayWord(restDays)}`);
   }
 
   return parts.join(" ");
+}
+
+function formatLongDaysLeftSpoken(days) {
+  const years = Math.floor(days / 365);
+  const daysAfterYears = days % 365;
+  const months = Math.floor(daysAfterYears / 30);
+  const restDays = daysAfterYears % 30;
+  const parts = [];
+
+  if (years) {
+    parts.push(`${getNumberWord(years)} ${getYearWord(years)}`);
+  }
+
+  if (months) {
+    parts.push(`${getNumberWord(months)} ${getMonthWord(months)}`);
+  }
+
+  if (restDays) {
+    parts.push(`${getNumberWord(restDays)} ${getDayWord(restDays)}`);
+  }
+
+  return parts.join(" ");
+}
+
+function getNumberWord(value) {
+  const numberWords = {
+    0: "ноль",
+    1: "один",
+    2: "два",
+    3: "три",
+    4: "четыре",
+    5: "пять",
+    6: "шесть",
+    7: "семь",
+    8: "восемь",
+    9: "девять",
+    10: "десять",
+    11: "одиннадцать",
+    12: "двенадцать",
+    13: "тринадцать",
+    14: "четырнадцать",
+    15: "пятнадцать",
+    16: "шестнадцать",
+    17: "семнадцать",
+    18: "восемнадцать",
+    19: "девятнадцать",
+    20: "двадцать",
+    21: "двадцать один",
+    22: "двадцать два",
+    23: "двадцать три",
+    24: "двадцать четыре",
+    25: "двадцать пять",
+    26: "двадцать шесть",
+    27: "двадцать семь",
+    28: "двадцать восемь",
+    29: "двадцать девять",
+    30: "тридцать",
+    31: "тридцать один",
+  };
+
+  return numberWords[value] || String(value);
+}
+
+function getDayWord(value) {
+  const lastTwoDigits = value % 100;
+  const lastDigit = value % 10;
+
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 14) {
+    return "дней";
+  }
+
+  if (lastDigit === 1) {
+    return "день";
+  }
+
+  if (lastDigit >= 2 && lastDigit <= 4) {
+    return "дня";
+  }
+
+  return "дней";
 }
 
 function getYearWord(value) {

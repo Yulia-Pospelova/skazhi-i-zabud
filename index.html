@@ -51,9 +51,8 @@
         <button
           class="start-button"
           type="button"
-          aria-label="Начать голосовую запись"
         >
-          <span class="start-icon">●</span>
+          <span class="start-icon" aria-hidden="true">●</span>
           <span class="start-text">Старт</span>
         </button>
 
@@ -81,9 +80,12 @@
             type="button"
             aria-label="Удалить все записи"
           >
-            Очистить все
+            Очистить всё
           </button>
         </div>
+        <p class="visually-hidden" id="reminders-list-title">
+          Список напоминаний
+        </p>
         <ul class="list"></ul>
       </section>
     </main>
