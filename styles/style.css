@@ -86,18 +86,6 @@ h1 {
   line-height: 1.35;
 }
 
-.examples-button {
-  min-block-size: 40px;
-  padding: 0 13px;
-  border: 0;
-  border-radius: var(--radius);
-  color: var(--color-text);
-  background: var(--color-control);
-  font-size: 16px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
 .examples-panel {
   display: grid;
   gap: 8px;
@@ -106,6 +94,7 @@ h1 {
   border-radius: var(--radius);
   color: var(--color-muted);
   background: var(--color-soft);
+  font-size: 16px;
 }
 
 .examples-panel[hidden] {
@@ -116,8 +105,12 @@ h1 {
   margin: 0;
 }
 
+.examples-label {
+  padding-top: 2px;
+}
+
 .examples-note {
-  margin-top: 4px;
+  margin-top: 6px;
   padding-top: 10px;
   border-top: 1px solid var(--color-border);
   font-size: 16px;
@@ -176,7 +169,8 @@ h1 {
 }
 
 .clear-button,
-.notify-button {
+.notify-button,
+.examples-button {
   border: 0;
   border-radius: var(--radius);
   cursor: pointer;
@@ -211,13 +205,15 @@ h1 {
   white-space: nowrap;
 }
 
-.notify-button {
+.notify-button,
+.examples-button {
   inline-size: auto;
   min-block-size: 48px;
   padding: 0 16px;
   color: var(--color-text);
   background: var(--color-control-strong);
   font-size: 17px;
+  white-space: nowrap;
 }
 
 .notify-status {
