@@ -275,6 +275,10 @@ h1 {
   background: var(--color-soft);
 }
 
+.item.is-editing {
+  border-color: var(--color-primary);
+}
+
 .item-name {
   margin: 0 0 4px;
   font-weight: 700;
@@ -297,16 +301,33 @@ h1 {
   font-weight: 700;
 }
 
+.item-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(92px, 1fr));
+  gap: 8px;
+}
+
+.edit-button,
 .delete-button {
-  inline-size: 42px;
+  inline-size: 100%;
   block-size: 42px;
   border: 0;
   border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.edit-button {
+  padding: 0 10px;
+  color: var(--color-primary);
+  background: #d8eadf;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.delete-button {
   color: var(--color-danger-text);
   background: var(--color-danger-soft);
-  font-size: 26px;
-  line-height: 1;
-  cursor: pointer;
+  font-size: 15px;
 }
 
 .empty {
@@ -366,6 +387,12 @@ h1 {
     inline-size: 100%;
   }
 
+  .item-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    inline-size: 100%;
+  }
+
+  .edit-button,
   .delete-button {
     inline-size: 100%;
   }

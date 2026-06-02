@@ -103,6 +103,22 @@ const hourWordMap = {
   "двадцать два": 22,
   "двадцать три": 23,
 };
+const amountWordMap = {
+  один: 1,
+  одна: 1,
+  одну: 1,
+  одно: 1,
+  два: 2,
+  две: 2,
+  три: 3,
+  четыре: 4,
+  пять: 5,
+  шесть: 6,
+  семь: 7,
+  восемь: 8,
+  девять: 9,
+  десять: 10,
+};
 const dayWordMap = {
   первого: 1,
   второе: 2,
@@ -197,6 +213,7 @@ let longPressTimer = null;
 let isLongPress = false;
 let shouldSkipNextRestart = false;
 let isRecognitionRunning = false;
+let editingItemId = null;
 let notificationTimers = [];
 let isSeriesActive = false;
 let lastErrorSpokenAt = 0;
@@ -359,6 +376,253 @@ function handlePhrase(value, options = {}) {
   clearPhraseSoon();
   scheduleItemNotifications(parsed);
   return true;
+}
+
+function handleEditPhrase(value) {
+  if (isStopPhrase(value)) {
+    finishEditing();
+    hideStatus();
+    return "stopped";
+  }
+
+  const item = items.find((currentItem) => currentItem.id === editingItemId);
+
+  if (!item) {
+    finishEditing();
+    return false;
+  }
+
+  const phrase = normalize(value);
+
+  if (/^(удали|удалить|убери|убрать)(\s|$)/.test(phrase)) {
+    deleteItem(item.id);
+    finishEditing();
+    showStatus("Удалено", SHORT_MESSAGE_VISIBLE_MS);
+    clearPhraseSoon();
+    return true;
+  }
+
+  const renamedItem = getRenamedItem(item, phrase);
+
+  if (renamedItem) {
+    updateItem(renamedItem);
+    finishEditing();
+    playSavedSound();
+    showStatus("Исправлено.");
+    clearPhraseSoon();
+    return true;
+  }
+
+  const correction = getCorrectedItem(item, value);
+
+  if (!correction) {
+    hideStatus();
+    speakError(value, lastParseError);
+    return false;
+  }
+
+  updateItem(correction);
+  finishEditing();
+  playSavedSound();
+  showStatus(`Исправлено. ${formatReminderMessage(correction)}`);
+  clearPhraseSoon();
+  return true;
+}
+
+function getRenamedItem(item, phrase) {
+  const match = phrase.match(/(?:^|\s)(?:измени|исправь|поменяй)\s+название\s+на\s+(.+)$/);
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    ...item,
+    name: getParsedName(match[1]),
+    source: match[1],
+  };
+}
+
+function getCorrectedItem(item, value) {
+  const isCommand = isCorrectionCommand(value);
+  const fullPhrase = isCommand ? null : parsePhrase(value);
+
+  if (fullPhrase && fullPhrase.name !== "Предмет") {
+    return {
+      ...item,
+      name: fullPhrase.name,
+      date: fullPhrase.date,
+      time: fullPhrase.time,
+      source: value.trim(),
+    };
+  }
+
+  const cleanedValue = cleanCorrectionCommand(value);
+  const relativeCorrection = getRelativeCorrectionItem(item, cleanedValue, value);
+
+  if (relativeCorrection) {
+    return relativeCorrection;
+  }
+
+  const parsedDate = parsePhrase(`${item.name} ${cleanedValue}`);
+
+  if (parsedDate && parsedDate.name !== "Предмет") {
+    return {
+      ...item,
+      date: parsedDate.date,
+      time: parsedDate.time || parseCorrectionTime(cleanedValue) || item.time,
+      source: value.trim(),
+    };
+  }
+
+  const time = parseTime(normalize(cleanedValue));
+
+  if (time) {
+    return {
+      ...item,
+      time,
+      source: value.trim(),
+    };
+  }
+
+  return null;
+}
+
+function getRelativeCorrectionItem(item, cleanedValue, sourceValue) {
+  const relative = parseRelativeCorrection(cleanedValue, parseItemDateTime(item));
+
+  if (!relative) {
+    return null;
+  }
+
+  return {
+    ...item,
+    date: toIsoDate(relative.date),
+    time: ["minute", "hour"].includes(relative.unit)
+      ? `${String(relative.date.getHours()).padStart(2, "0")}:${String(relative.date.getMinutes()).padStart(2, "0")}`
+      : item.time,
+    source: sourceValue.trim(),
+  };
+}
+
+function parseRelativeCorrection(value, baseDate) {
+  const phrase = normalize(value);
+  const halfYear = phrase.match(/^через\s+(полгода|пол\s+года|полгоду)/);
+
+  if (halfYear) {
+    return getRelativeDateByAmount(6, "месяц", 0, baseDate);
+  }
+
+  const singleUnitMatch = phrase.match(/^через\s+(минуту|час|день|неделю|месяц|год)/);
+
+  if (singleUnitMatch) {
+    return getRelativeDateByAmount(1, singleUnitMatch[1], 0, baseDate);
+  }
+
+  const amountWords = Object.keys(amountWordMap).sort((a, b) => b.length - a.length).join("|");
+  const spokenMatch = new RegExp(
+    `^через\\s+(${amountWords})\\s+(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет)`,
+  ).exec(phrase);
+
+  if (spokenMatch) {
+    return getRelativeDateByAmount(amountWordMap[spokenMatch[1]], spokenMatch[2], 0, baseDate);
+  }
+
+  const numberMatch = phrase.match(
+    /^через\s+(минуту|час|день|неделю|месяц|год|(\d+)\s*(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет))/,
+  );
+
+  if (!numberMatch) {
+    return null;
+  }
+
+  return getRelativeDateByAmount(
+    numberMatch[2] ? Number(numberMatch[2]) : 1,
+    numberMatch[3] || numberMatch[1],
+    0,
+    baseDate,
+  );
+}
+
+function isCorrectionCommand(value) {
+  return /^(перенеси|перенести|исправь|исправить|поставь|поставить|измени|изменить|поменяй|поменять)(\s|$)/.test(normalize(value));
+}
+
+function parseCorrectionTime(value) {
+  const phrase = normalize(value);
+  const prefixedTime = parseTime(`на ${phrase}`);
+
+  if (prefixedTime && !/\d{1,2}\s+(январь|январе|января|феврале|февраль|февраля|март|марте|марта|апрель|апреле|апреля|май|мае|мая|июнь|июне|июня|июль|июле|июля|август|августе|августа|сентябрь|сентябре|сентября|октябрь|октябре|октября|ноябрь|ноябре|ноября|декабрь|декабре|декабря)/.test(phrase)) {
+    return prefixedTime;
+  }
+
+  const match = phrase.match(/(?:^|\s)(\d{1,2})(?::(\d{2})|\s*(?:часа?|часов)(?:\s*(?:и\s*)?(\d{1,2})\s*(?:минут|минуты|минута))?)?\s*(утра|вечера|дня|ночи)?$/);
+
+  if (!match) {
+    return null;
+  }
+
+  let hour = Number(match[1]);
+  const minute = Number(match[2] || match[3] || 0);
+  const dayPart = match[4];
+
+  if (dayPart === "вечера" || dayPart === "дня") {
+    if (hour < 12) {
+      hour += 12;
+    }
+  } else if (!dayPart && hour >= 1 && hour <= 11) {
+    hour += 12;
+  }
+
+  if (dayPart === "ночи" && hour === 12) {
+    hour = 0;
+  }
+
+  if (hour > 23 || minute > 59) {
+    return null;
+  }
+
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function cleanCorrectionCommand(value) {
+  return normalize(value)
+    .replace(/^(перенеси|перенести|исправь|исправить|поставь|поставить|измени|изменить|поменяй|поменять)\s+/, "")
+    .replace(/^(дату|срок|время)\s+/, "")
+    .replace(/^на\s+(?=(сегодня|завтра|послезавтра))/g, "")
+    .replace(/^на\s+(?=(минуту|час|день|неделю|месяц|год))/g, "через ")
+    .replace(/^на\s+(?=\d+\s*(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет))/g, "через ")
+    .replace(/^на\s+(?=(один|одна|одну|одно|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять)\s+(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет))/g, "через ")
+    .replace(/^на\s+(?=\d{1,2}\s+(январь|январе|января|феврале|февраль|февраля|март|марте|марта|апрель|апреле|апреля|май|мае|мая|июнь|июне|июня|июль|июле|июля|август|августе|августа|сентябрь|сентябре|сентября|октябрь|октябре|октября|ноябрь|ноябре|ноября|декабрь|декабре|декабря))/g, "")
+    .trim();
+}
+
+function updateItem(updatedItem) {
+  items = sortByDate(items.map((item) => (
+    item.id === updatedItem.id ? updatedItem : item
+  )));
+  saveItems();
+  renderList();
+  scheduleAllNotifications();
+}
+
+function finishEditing() {
+  editingItemId = null;
+  stopSeriesListening();
+  renderList();
+}
+
+function startEditingItem(id) {
+  if (!recognition) {
+    showStatus("Голос может быть недоступен в этом браузере");
+    return;
+  }
+
+  editingItemId = id;
+  isSeriesActive = false;
+  renderList();
+  showStatus("Скажи: измени название на..., перенеси на..., исправь на..., удали");
+  restartRecognition();
 }
 
 function hasDuplicateItem(newItem) {
@@ -526,6 +790,12 @@ function parseRelativeDate(phrase) {
     return halfYear;
   }
 
+  const spokenRelativeDate = parseSpokenRelativeDate(phrase);
+
+  if (spokenRelativeDate) {
+    return spokenRelativeDate;
+  }
+
   const match = phrase.match(
     /(?:^|\s)через\s+(минуту|час|день|неделю|месяц|год|(\d+)\s*(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет))/,
   );
@@ -553,6 +823,40 @@ function parseRelativeDate(phrase) {
   }
 
   return { date, index: match.index, unit: getRelativeUnit(unit) };
+}
+
+function parseSpokenRelativeDate(phrase) {
+  const amountWords = Object.keys(amountWordMap).sort((a, b) => b.length - a.length).join("|");
+  const regex = new RegExp(
+    `(?:^|\\s)через\\s+(${amountWords})\\s+(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет)`,
+  );
+  const match = regex.exec(phrase);
+
+  if (!match) {
+    return null;
+  }
+
+  return getRelativeDateByAmount(amountWordMap[match[1]], match[2], match.index);
+}
+
+function getRelativeDateByAmount(amount, unit, index, baseDate = new Date()) {
+  const date = new Date(baseDate);
+
+  if (unit.startsWith("мин")) {
+    date.setMinutes(date.getMinutes() + amount);
+  } else if (unit.startsWith("час")) {
+    date.setHours(date.getHours() + amount);
+  } else if (unit.startsWith("д")) {
+    date.setDate(date.getDate() + amount);
+  } else if (unit.startsWith("нед")) {
+    date.setDate(date.getDate() + amount * 7);
+  } else if (unit.startsWith("мес")) {
+    date.setMonth(date.getMonth() + amount);
+  } else {
+    date.setFullYear(date.getFullYear() + amount);
+  }
+
+  return { date, index, unit: getRelativeUnit(unit) };
 }
 
 function parseHalfYearDate(phrase) {
@@ -1019,31 +1323,42 @@ function renderList() {
 
   sortByDate(items).forEach((item) => {
     const element = document.createElement("li");
-    element.className = "item";
+    element.className = item.id === editingItemId ? "item is-editing" : "item";
 
     const content = document.createElement("div");
+    const actions = document.createElement("div");
     const name = document.createElement("p");
     const date = document.createElement("p");
     const days = document.createElement("div");
+    const editButton = document.createElement("button");
     const deleteButton = document.createElement("button");
 
     name.className = "item-name";
     date.className = "item-date";
     days.className = "item-days";
+    actions.className = "item-actions";
+    editButton.className = "edit-button";
     deleteButton.className = "delete-button";
+    editButton.type = "button";
     deleteButton.type = "button";
+    editButton.setAttribute("aria-label", `Исправить напоминание ${item.name}`);
     deleteButton.setAttribute("aria-label", `Удалить напоминание ${item.name}`);
 
     name.textContent = item.name;
     date.textContent = formatDate(item.date, item.time);
     days.textContent = formatDaysLeft(item.date);
-    deleteButton.textContent = "×";
+    editButton.textContent = "Исправить";
+    deleteButton.textContent = "Удалить";
+    editButton.addEventListener("click", () => {
+      startEditingItem(item.id);
+    });
     deleteButton.addEventListener("click", () => {
       deleteItem(item.id);
     });
 
     content.append(name, date);
-    element.append(content, days, deleteButton);
+    actions.append(editButton, deleteButton);
+    element.append(content, days, actions);
     list.append(element);
   });
 }
@@ -1077,11 +1392,17 @@ function setupSpeech() {
     const phrase = event.results[0][0].transcript;
 
     if (isStopPhrase(phrase)) {
-      handlePhrase(phrase, { fromSpeech: true });
+      if (editingItemId) {
+        handleEditPhrase(phrase);
+      } else {
+        handlePhrase(phrase, { fromSpeech: true });
+      }
       return;
     }
 
-    const result = handlePhrase(phrase, { fromSpeech: true });
+    const result = editingItemId
+      ? handleEditPhrase(phrase)
+      : handlePhrase(phrase, { fromSpeech: true });
 
     if (result !== false) {
       showRecognizedPhrase(phrase);
