@@ -456,6 +456,8 @@ function getCorrectedItem(item, value) {
       date: fullPhrase.date,
       time: fullPhrase.time,
       source: value.trim(),
+      correctionBaseDate: undefined,
+      correctionBaseTime: undefined,
     };
   }
 
@@ -474,6 +476,8 @@ function getCorrectedItem(item, value) {
       date: parsedDate.date,
       time: parsedDate.time || parseCorrectionTime(cleanedValue) || item.time,
       source: value.trim(),
+      correctionBaseDate: undefined,
+      correctionBaseTime: undefined,
     };
   }
 
@@ -484,6 +488,8 @@ function getCorrectedItem(item, value) {
       ...item,
       time,
       source: value.trim(),
+      correctionBaseDate: undefined,
+      correctionBaseTime: undefined,
     };
   }
 
@@ -491,11 +497,22 @@ function getCorrectedItem(item, value) {
 }
 
 function getRelativeCorrectionItem(item, cleanedValue, sourceValue) {
-  const relative = parseRelativeCorrection(cleanedValue, parseItemDateTime(item));
+  const usePreviousCorrectionBase = isCorrectionUpdateCommand(sourceValue);
+  const correctionBase = usePreviousCorrectionBase
+    ? getCorrectionBaseItem(item)
+    : item;
+  const relative = parseRelativeCorrection(cleanedValue, parseItemDateTime(correctionBase));
 
   if (!relative) {
     return null;
   }
+
+  const baseDate = usePreviousCorrectionBase && item.correctionBaseDate
+    ? item.correctionBaseDate
+    : item.date;
+  const baseTime = usePreviousCorrectionBase && item.correctionBaseTime !== undefined
+    ? item.correctionBaseTime
+    : item.time;
 
   return {
     ...item,
@@ -504,7 +521,25 @@ function getRelativeCorrectionItem(item, cleanedValue, sourceValue) {
       ? `${String(relative.date.getHours()).padStart(2, "0")}:${String(relative.date.getMinutes()).padStart(2, "0")}`
       : item.time,
     source: sourceValue.trim(),
+    correctionBaseDate: baseDate,
+    correctionBaseTime: baseTime,
   };
+}
+
+function getCorrectionBaseItem(item) {
+  if (!item.correctionBaseDate) {
+    return item;
+  }
+
+  return {
+    ...item,
+    date: item.correctionBaseDate,
+    time: item.correctionBaseTime,
+  };
+}
+
+function isCorrectionUpdateCommand(value) {
+  return /^(обнови|обновить)(\s|$)/.test(normalize(value));
 }
 
 function parseRelativeCorrection(value, baseDate) {
@@ -547,7 +582,7 @@ function parseRelativeCorrection(value, baseDate) {
 }
 
 function isCorrectionCommand(value) {
-  return /^(перенеси|перенести|исправь|исправить|поставь|поставить|измени|изменить|поменяй|поменять)(\s|$)/.test(normalize(value));
+  return /^(перенеси|перенести|исправь|исправить|поставь|поставить|измени|изменить|обнови|обновить|поменяй|поменять)(\s|$)/.test(normalize(value));
 }
 
 function parseCorrectionTime(value) {
@@ -589,7 +624,7 @@ function parseCorrectionTime(value) {
 
 function cleanCorrectionCommand(value) {
   return normalize(value)
-    .replace(/^(перенеси|перенести|исправь|исправить|поставь|поставить|измени|изменить|поменяй|поменять)\s+/, "")
+    .replace(/^(перенеси|перенести|исправь|исправить|поставь|поставить|измени|изменить|обнови|обновить|поменяй|поменять)\s+/, "")
     .replace(/^(дату|срок|время)\s+/, "")
     .replace(/^на\s+(?=(сегодня|завтра|послезавтра))/g, "")
     .replace(/^на\s+(?=(минуту|час|день|неделю|месяц|год))/g, "через ")
@@ -633,7 +668,7 @@ function startEditingItem(id) {
   isSeriesActive = false;
   clearEditButtonFocus(id);
   startButton.classList.add("is-listening");
-  showStatus("Скажи: измени название на..., перенеси на..., исправь на..., удали");
+  showStatus("Скажи команду исправления");
   restartRecognition();
 }
 

@@ -182,6 +182,8 @@ h1 {
   margin: 14px 0 0;
   color: var(--color-muted);
   font-size: 18px;
+  line-height: 1.35;
+  white-space: pre-line;
   opacity: 0;
   transform: translateY(-4px);
   transition:
