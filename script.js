@@ -317,6 +317,7 @@ function startSingleListening() {
     return;
   }
 
+  cancelEditing();
   isSeriesActive = false;
   startButton.classList.add("is-listening");
   showStatus("Слушаю.");
@@ -613,6 +614,15 @@ function finishEditing() {
   renderList();
 }
 
+function cancelEditing() {
+  if (!editingItemId) {
+    return;
+  }
+
+  editingItemId = null;
+  renderList();
+}
+
 function startEditingItem(id) {
   if (!recognition) {
     showStatus("Голос может быть недоступен в этом браузере");
@@ -622,6 +632,7 @@ function startEditingItem(id) {
   editingItemId = id;
   isSeriesActive = false;
   clearEditButtonFocus(id);
+  startButton.classList.add("is-listening");
   showStatus("Скажи: измени название на..., перенеси на..., исправь на..., удали");
   restartRecognition();
 }
@@ -658,6 +669,7 @@ function startSeriesListening() {
     return;
   }
 
+  cancelEditing();
   isSeriesActive = true;
   startButton.classList.add("is-listening");
   showStatus("Слушаю. Можно сказать несколько фраз.");
@@ -1485,8 +1497,16 @@ function setupSpeech() {
       startButton.classList.remove("is-listening");
     }
 
-    showStatus("Голос не сработал. Нажми старт еще раз");
+    showStatus(getRecognitionErrorMessage());
   });
+}
+
+function getRecognitionErrorMessage() {
+  if (editingItemId) {
+    return "Голос не сработал. Нажми исправить еще раз";
+  }
+
+  return "Голос не сработал. Нажми старт еще раз";
 }
 
 async function requestNotificationPermission() {

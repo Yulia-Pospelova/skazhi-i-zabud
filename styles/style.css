@@ -65,6 +65,7 @@ h1 {
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
+  transition: background-color 260ms ease;
 }
 
 .start-button:active {
