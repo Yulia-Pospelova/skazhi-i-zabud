@@ -76,6 +76,33 @@ const monthMap = {
   декабре: 11,
   декабря: 11,
 };
+const hourWordMap = {
+  один: 1,
+  одна: 1,
+  два: 2,
+  две: 2,
+  три: 3,
+  четыре: 4,
+  пять: 5,
+  шесть: 6,
+  семь: 7,
+  восемь: 8,
+  девять: 9,
+  десять: 10,
+  одиннадцать: 11,
+  двенадцать: 12,
+  тринадцать: 13,
+  четырнадцать: 14,
+  пятнадцать: 15,
+  шестнадцать: 16,
+  семнадцать: 17,
+  восемнадцать: 18,
+  девятнадцать: 19,
+  двадцать: 20,
+  "двадцать один": 21,
+  "двадцать два": 22,
+  "двадцать три": 23,
+};
 const dayWordMap = {
   первого: 1,
   второе: 2,
@@ -168,6 +195,8 @@ let restartTimer = null;
 let startClickTimer = null;
 let longPressTimer = null;
 let isLongPress = false;
+let shouldSkipNextRestart = false;
+let isRecognitionRunning = false;
 let notificationTimers = [];
 let isSeriesActive = false;
 let lastErrorSpokenAt = 0;
@@ -237,6 +266,7 @@ function assignElements() {
 }
 
 function handleStartClick(event) {
+  unlockAudio();
   clearTimeout(startClickTimer);
 
   if (isLongPress) {
@@ -248,6 +278,7 @@ function handleStartClick(event) {
 }
 
 function handleStartPress() {
+  unlockAudio();
   clearTimeout(longPressTimer);
   isLongPress = false;
 
@@ -272,7 +303,7 @@ function startSingleListening() {
   startButton.classList.add("is-listening");
   showStatus("Слушаю.");
   lastErrorPhrase = "";
-  startRecognition();
+  restartRecognition();
 }
 
 function toggleExamples() {
@@ -358,7 +389,7 @@ function startSeriesListening() {
   startButton.classList.add("is-listening");
   showStatus("Слушаю. Можно сказать несколько фраз.");
   lastErrorPhrase = "";
-  startRecognition();
+  restartRecognition();
 }
 
 function stopSeriesListening() {
@@ -376,9 +407,31 @@ function stopSeriesListening() {
 function startRecognition() {
   try {
     recognition.start();
+    isRecognitionRunning = true;
   } catch (error) {
-    // Some browsers throw if start is called while recognition is still closing.
+    isRecognitionRunning = false;
+    startButton.classList.remove("is-listening");
+    showStatus("Голос не запустился. Обнови страницу и нажми старт еще раз.");
   }
+}
+
+function restartRecognition() {
+  clearTimeout(restartTimer);
+
+  if (!isRecognitionRunning) {
+    startRecognition();
+    return;
+  }
+
+  try {
+    shouldSkipNextRestart = true;
+    recognition.stop();
+  } catch (error) {
+    shouldSkipNextRestart = false;
+    // Recognition may already be stopped.
+  }
+
+  restartTimer = setTimeout(startRecognition, 180);
 }
 
 function parsePhrase(value) {
@@ -703,6 +756,12 @@ function getWeekdayDate(weekday, isNextWeek) {
 }
 
 function parseTime(phrase) {
+  const spokenTime = parseSpokenHourTime(phrase);
+
+  if (spokenTime) {
+    return spokenTime;
+  }
+
   const wordMatch = phrase.match(/(?:^|\s)(?:в|на)\s+час\s*(утра|вечера|дня|ночи)?/);
 
   if (wordMatch) {
@@ -741,6 +800,35 @@ function parseTime(phrase) {
   }
 
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function parseSpokenHourTime(phrase) {
+  const hourWords = Object.keys(hourWordMap).sort((a, b) => b.length - a.length).join("|");
+  const regex = new RegExp(
+    `(?:^|\\s)(?:в|на)\\s+(${hourWords})(?:\\s+час(?:а|ов)?)?\\s*(утра|вечера|дня|ночи)?`,
+  );
+  const match = regex.exec(phrase);
+
+  if (!match) {
+    return null;
+  }
+
+  let hour = hourWordMap[match[1]];
+  const dayPart = match[2];
+
+  if (dayPart === "вечера" || dayPart === "дня") {
+    if (hour < 12) {
+      hour += 12;
+    }
+  } else if (!dayPart && hour >= 1 && hour <= 11) {
+    hour += 12;
+  }
+
+  if (dayPart === "ночи" && hour === 12) {
+    hour = 0;
+  }
+
+  return `${String(hour).padStart(2, "0")}:00`;
 }
 
 function parseExactDate(phrase, relative) {
@@ -904,6 +992,7 @@ function cleanName(name) {
       .replace(/\bв\s+(начале|середине|конце)\s+(следующего\s+)?года/g, "")
       .replace(/\bв\s+следующ(?:ем|ий)\s+месяц(?:е)?/g, "")
       .replace(/\bв\s+(?:(начале|середине|конце)\s+)?(январь|январе|января|феврале|февраль|февраля|март|марте|марта|апрель|апреле|апреля|май|мае|мая|июнь|июне|июня|июль|июле|июля|август|августе|августа|сентябрь|сентябре|сентября|октябрь|октябре|октября|ноябрь|ноябре|ноября|декабрь|декабре|декабря)/g, "")
+      .replace(/\b(?:в|на)\s+(один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|двадцать один|двадцать два|двадцать три)(?:\s+час(?:а|ов)?)?\s*(утра|вечера|дня|ночи)?/g, "")
       .replace(/\b(?:в|на)\s+час\s*(утра|вечера|дня|ночи)?/g, "")
       .replace(/\b(?:в|на)\s+\d{1,2}(?::\d{2}|\s*(?:часа?|часов)(?:\s*(?:и\s*)?\d{1,2}\s*(?:минут|минуты|минута))?)?\s*(утра|вечера|дня|ночи)?/g, "")
       .replace(/(?:в\s+)?(?:следующий|следующая|следующее|следующей)?\s*(понедельник|понедельника|вторник|вторника|среду|среда|среды|четверг|четверга|пятницу|пятница|пятницы|субботу|суббота|субботы|воскресенье|воскресенья)/g, "")
@@ -1005,6 +1094,13 @@ function setupSpeech() {
   });
 
   recognition.addEventListener("end", () => {
+    isRecognitionRunning = false;
+
+    if (shouldSkipNextRestart) {
+      shouldSkipNextRestart = false;
+      return;
+    }
+
     if (!isSeriesActive) {
       startButton.classList.remove("is-listening");
       return;
@@ -1015,6 +1111,8 @@ function setupSpeech() {
   });
 
   recognition.addEventListener("error", (event) => {
+    isRecognitionRunning = false;
+
     if (isSeriesActive && event.error === "no-speech") {
       return;
     }
@@ -1149,14 +1247,34 @@ function speak(message) {
 }
 
 function playSavedSound() {
+  if (!unlockAudio()) {
+    return;
+  }
+
+  if (audioContext.state === "suspended") {
+    return;
+  }
+
+  playSavedBeep();
+}
+
+function unlockAudio() {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
 
   if (!AudioContext) {
-    return;
+    return false;
   }
 
   audioContext = audioContext || new AudioContext();
 
+  if (audioContext.state === "suspended" && audioContext.resume) {
+    audioContext.resume();
+  }
+
+  return true;
+}
+
+function playSavedBeep() {
   const oscillator = audioContext.createOscillator();
   const gain = audioContext.createGain();
   const now = audioContext.currentTime;
@@ -1176,13 +1294,9 @@ function playSavedSound() {
 }
 
 function playAlarmSound() {
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-
-  if (!AudioContext) {
+  if (!unlockAudio()) {
     return;
   }
-
-  audioContext = audioContext || new AudioContext();
 
   [0, 0.45, 0.9, 1.35].forEach((offset) => {
     playAlarmBeep(audioContext.currentTime + offset);
@@ -1282,6 +1396,10 @@ function getNotificationTimes(item) {
   }
 
   if (item.time) {
+    if (isSoonTimedEvent(dueDate)) {
+      return [dueDate];
+    }
+
     return getTimedEventNotificationTimes(dueDate);
   }
 
@@ -1309,6 +1427,10 @@ function getTimedEventNotificationTimes(dueDate) {
   times.push(beforeEvent);
 
   return times;
+}
+
+function isSoonTimedEvent(dueDate) {
+  return dueDate.getTime() - Date.now() < 24 * 60 * 60 * 1000;
 }
 
 function scheduleNotification(item, notificationTime) {
@@ -1444,6 +1566,10 @@ function formatReminderMessage(item) {
   }
 
   if (item.time) {
+    if (isSoonTimedEvent(parseItemDateTime(item))) {
+      return "Напомню в указанное время.";
+    }
+
     return "Напомню накануне вечером, заранее и в указанное время.";
   }
 
