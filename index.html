@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Скажи и забудь</title>
+    <title>скажи и забудь</title>
     <link rel="stylesheet" href="./fonts/fonts.css" />
     <link rel="stylesheet" href="./styles/variables.css" />
     <link rel="stylesheet" href="./styles/globals.css" />
@@ -14,10 +14,10 @@
   <body class="page">
     <main class="app">
       <section class="hero">
-        <h1>Скажи и забудь</h1>
+        <h1>скажи и забудь</h1>
         <div class="hero-actions">
           <button class="notify-button" type="button">
-            Настроить уведомления
+            настроить уведомления
           </button>
           <button
             class="examples-button"
@@ -25,42 +25,46 @@
             aria-expanded="false"
             aria-controls="examples-panel"
           >
-            Как пользоваться
+            как пользоваться
           </button>
         </div>
         <div class="examples-panel" id="examples-panel" hidden>
-          <p>Формат: что и когда.</p>
-          <p class="examples-label">Например:</p>
-          <p>молоко до завтра</p>
-          <p>стрижка сегодня в 9 вечера</p>
-          <p>таблетка через 30 минут</p>
-          <p>паспорт до марта следующего года</p>
-          <p class="examples-note">
-            Одна запись: короткое нажатие.
-          </p>
+          <p class="examples-title">Запись напоминания</p>
           <p>
-            Несколько записей: нажми и подержи Старт, потом отпусти. Говори с
-            небольшими паузами. Чтобы закончить серию, скажи: “готово”.
+            Нажми <span class="button-name">старт</span> и скажи в формате: что и когда, например:
           </p>
+          <div class="examples-list">
+            <p>- молоко до завтра</p>
+            <p>- стрижка сегодня в 9 вечера</p>
+            <p>- таблетка через 30 минут</p>
+            <p>- паспорт до марта следующего года</p>
+          </div>
+          <div class="examples-note examples-note--plain">
+            <p>Одна запись: короткое нажатие.</p>
+            <p>Несколько записей: нажми и подержи <span class="button-name">старт</span>, потом отпусти.</p>
+            <p>Говори с небольшими паузами.</p>
+            <p>Чтобы закончить серию, скажи: “готово”.</p>
+          </div>
           <div class="examples-note">
-            <p>Исправление:</p>
-            <p>измени название на...</p>
-            <p>перенеси на...</p>
-            <p>удали</p>
-            <p>обнови...</p>
+            <p class="examples-title">Изменение записи</p>
+            <p>Нажми <span class="button-name">изменить</span> и скажи: измени на... или удали.</p>
+          </div>
+          <div class="examples-note">
+            <p class="examples-title">Поиск напоминания</p>
+            <p>Нажми <span class="button-name">поиск</span> и скажи название напоминания.</p>
           </div>
         </div>
         <p class="notify-status" aria-live="polite"></p>
       </section>
 
-      <section class="capture" aria-label="Напоминание">
-        <p class="start-hint">Нажми старт и скажи</p>
+      <section class="capture" aria-label="напоминание">
+        <p class="start-hint">нажми старт и скажи</p>
         <button
           class="start-button"
           type="button"
         >
           <span class="start-icon" aria-hidden="true">●</span>
-          <span class="start-text">Старт</span>
+          <span class="start-text">старт</span>
         </button>
 
         <div class="phrase-form">
@@ -81,20 +85,39 @@
 
       <section class="timeline">
         <div class="timeline-head">
-          <h2>Ближайшие сроки</h2>
+          <button class="search-button" type="button">
+            поиск
+          </button>
           <button
             class="clear-button"
             type="button"
-            aria-label="Удалить все записи"
+            aria-label="удалить все записи"
           >
-            Очистить всё
+            очистить всё
           </button>
         </div>
         <p class="visually-hidden" id="reminders-list-title">
-          Список напоминаний
+          список напоминаний
         </p>
         <ul class="list"></ul>
       </section>
+
+      <div class="search-modal" hidden>
+        <div
+          class="search-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="search-dialog-title"
+        >
+          <div class="search-dialog-head">
+            <h2 id="search-dialog-title">найдено</h2>
+            <button class="search-close-button" type="button">
+              закрыть
+            </button>
+          </div>
+          <div class="search-results"></div>
+        </div>
+      </div>
     </main>
   </body>
 </html>

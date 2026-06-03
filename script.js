@@ -7,6 +7,10 @@ let notifyStatus = null;
 let examplesButton = null;
 let examplesPanel = null;
 let clearButton = null;
+let searchButton = null;
+let searchModal = null;
+let searchResults = null;
+let searchCloseButton = null;
 let list = null;
 
 const STORAGE_KEY = "expiry-reminders";
@@ -215,6 +219,10 @@ let isLongPress = false;
 let shouldSkipNextRestart = false;
 let isRecognitionRunning = false;
 let editingItemId = null;
+let isSearchActive = false;
+let searchReturnFocus = null;
+let currentSearchItemIds = [];
+let currentSearchQuery = "";
 let notificationTimers = [];
 let isSeriesActive = false;
 let lastErrorSpokenAt = 0;
@@ -262,9 +270,27 @@ function initApp() {
         items = [];
         saveItems();
         renderList();
-        showStatus("Список очищен", SHORT_MESSAGE_VISIBLE_MS);
+        showStatus("список очищен", SHORT_MESSAGE_VISIBLE_MS);
       });
     }
+
+    if (searchButton) {
+      searchButton.addEventListener("click", startSearchListening);
+    }
+
+    if (searchCloseButton) {
+      searchCloseButton.addEventListener("click", closeSearchDialog);
+    }
+
+    if (searchModal) {
+      searchModal.addEventListener("click", (event) => {
+        if (event.target === searchModal) {
+          closeSearchDialog();
+        }
+      });
+    }
+
+    document.addEventListener("keydown", handleDocumentKeydown);
   } catch (error) {
     console.error("App init failed", error);
   }
@@ -280,6 +306,10 @@ function assignElements() {
   examplesButton = document.querySelector(".examples-button");
   examplesPanel = document.querySelector(".examples-panel");
   clearButton = document.querySelector(".clear-button");
+  searchButton = document.querySelector(".search-button");
+  searchModal = document.querySelector(".search-modal");
+  searchResults = document.querySelector(".search-results");
+  searchCloseButton = document.querySelector(".search-close-button");
   list = document.querySelector(".list");
 }
 
@@ -313,14 +343,32 @@ function clearStartPress() {
 
 function startSingleListening() {
   if (!recognition) {
-    showStatus("Скажи или напиши одной фразой: страховка до 15 июля");
+    showStatus("скажи или напиши одной фразой: страховка до 15 июля");
     return;
   }
 
   cancelEditing();
+  cancelSearch();
   isSeriesActive = false;
   startButton.classList.add("is-listening");
-  showStatus("Слушаю.");
+  showStatus("слушаю.");
+  lastErrorPhrase = "";
+  restartRecognition();
+}
+
+function startSearchListening() {
+  unlockAudio();
+
+  if (!recognition) {
+    showStatus("голос может быть недоступен в этом браузере");
+    return;
+  }
+
+  cancelEditing();
+  isSearchActive = true;
+  isSeriesActive = false;
+  startButton.classList.add("is-listening");
+  showStatus("назови напоминание");
   lastErrorPhrase = "";
   restartRecognition();
 }
@@ -335,6 +383,224 @@ function toggleExamples() {
   examplesButton.setAttribute("aria-expanded", String(!isOpen));
 }
 
+function handleDocumentKeydown(event) {
+  if (event.key === "Escape" && searchModal && !searchModal.hidden) {
+    closeSearchDialog();
+    return;
+  }
+
+  if (event.key === "Tab" && searchModal && !searchModal.hidden) {
+    keepFocusInsideSearchDialog(event);
+  }
+}
+
+function handleSearchPhrase(value) {
+  const query = normalizeSearchText(value);
+
+  if (!query) {
+    showStatus("не нашла такое напоминание");
+    return false;
+  }
+
+  const matches = findItemsByName(query);
+  cancelSearch();
+
+  if (!matches.length) {
+    showStatus("не нашла такое напоминание");
+    clearPhraseSoon();
+    return true;
+  }
+
+  showSearchDialog(matches, value);
+  clearPhraseSoon();
+  return true;
+}
+
+function findItemsByName(query) {
+  return sortByDate(items).filter((item) => (
+    isSearchMatch(normalizeSearchText(item.name), query)
+  ));
+}
+
+function isSearchMatch(name, query) {
+  if (name.includes(query) || query.includes(name)) {
+    return true;
+  }
+
+  const queryWords = query.split(" ").filter(Boolean);
+  const nameWords = name.split(" ").filter(Boolean);
+
+  return queryWords.every((queryWord) => (
+    nameWords.some((nameWord) => hasCommonWordStart(nameWord, queryWord))
+  ));
+}
+
+function hasCommonWordStart(firstWord, secondWord) {
+  const minLength = Math.min(firstWord.length, secondWord.length);
+
+  if (minLength < 4) {
+    return firstWord === secondWord;
+  }
+
+  return firstWord.slice(0, minLength - 1) === secondWord.slice(0, minLength - 1);
+}
+
+function normalizeSearchText(value) {
+  return normalize(value)
+    .replace(/[.,!?]+/g, "")
+    .replace(/^(найди|найти|когда|покажи|показать)\s+/, "")
+    .trim();
+}
+
+function showSearchDialog(matches, query) {
+  if (!searchModal || !searchResults || !searchCloseButton) {
+    return;
+  }
+
+  searchReturnFocus = document.activeElement;
+  currentSearchItemIds = matches.map((item) => item.id);
+  currentSearchQuery = query;
+  searchResults.innerHTML = "";
+  matches.forEach((item) => {
+    searchResults.append(createSearchResult(item));
+  });
+
+  searchModal.hidden = false;
+  searchCloseButton.focus();
+  showStatus(`найдено: ${matches.length}`);
+  announceToScreenReader(`найдено по запросу ${query}: ${matches.length}`);
+}
+
+function createSearchResult(item) {
+  const result = document.createElement("article");
+  const content = document.createElement("div");
+  const name = document.createElement("h3");
+  const date = document.createElement("p");
+  const days = document.createElement("p");
+  const actions = document.createElement("div");
+  const editButton = document.createElement("button");
+  const deleteButton = document.createElement("button");
+  const closeButton = document.createElement("button");
+
+  result.className = "search-result";
+  content.className = "search-result-content";
+  name.className = "search-result-name";
+  date.className = "search-result-date";
+  days.className = "search-result-days";
+  actions.className = "search-result-actions";
+  editButton.className = "edit-button";
+  deleteButton.className = "delete-button";
+  closeButton.className = "search-result-close-button";
+  editButton.type = "button";
+  deleteButton.type = "button";
+  closeButton.type = "button";
+  editButton.setAttribute("aria-label", `изменить напоминание ${formatDisplayName(item.name)}`);
+  deleteButton.setAttribute("aria-label", `удалить напоминание ${formatDisplayName(item.name)}`);
+  closeButton.setAttribute("aria-label", `убрать из окна напоминание ${formatDisplayName(item.name)}`);
+
+  name.textContent = formatDisplayName(item.name);
+  date.textContent = formatDate(item.date, item.time);
+  days.textContent = formatDaysLeftVisible(item.date);
+  editButton.textContent = "изменить";
+  deleteButton.textContent = "удалить";
+  closeButton.textContent = "закрыть";
+
+  editButton.addEventListener("click", () => {
+    startEditingItem(item.id);
+  });
+
+  deleteButton.addEventListener("click", () => {
+    deleteItem(item.id);
+    refreshSearchDialog();
+  });
+
+  closeButton.addEventListener("click", () => {
+    removeSearchResult(item.id);
+  });
+
+  content.append(name, date, days);
+  actions.append(editButton, deleteButton, closeButton);
+  result.append(content, actions);
+  return result;
+}
+
+function closeSearchDialog(options = {}) {
+  const { restoreFocus = true } = options;
+
+  if (!searchModal) {
+    return;
+  }
+
+  searchModal.hidden = true;
+
+  if (searchResults) {
+    searchResults.innerHTML = "";
+  }
+
+  currentSearchItemIds = [];
+  currentSearchQuery = "";
+
+  if (restoreFocus && searchReturnFocus && typeof searchReturnFocus.focus === "function") {
+    searchReturnFocus.focus();
+  }
+
+  searchReturnFocus = null;
+}
+
+function removeSearchResult(id) {
+  currentSearchItemIds = currentSearchItemIds.filter((itemId) => itemId !== id);
+  refreshSearchDialog();
+}
+
+function refreshSearchDialog() {
+  if (!searchModal || searchModal.hidden || !searchResults) {
+    return;
+  }
+
+  const matches = sortByDate(items.filter((item) => (
+    currentSearchItemIds.includes(item.id)
+  )));
+  searchResults.innerHTML = "";
+
+  if (!matches.length) {
+    closeSearchDialog();
+    return;
+  }
+
+  currentSearchItemIds = matches.map((item) => item.id);
+  matches.forEach((item) => {
+    searchResults.append(createSearchResult(item));
+  });
+  announceToScreenReader(`обновлено: ${matches.length}`);
+}
+
+function keepFocusInsideSearchDialog(event) {
+  const focusable = getSearchDialogFocusableElements();
+
+  if (!focusable.length) {
+    return;
+  }
+
+  const firstElement = focusable[0];
+  const lastElement = focusable[focusable.length - 1];
+
+  if (event.shiftKey && document.activeElement === firstElement) {
+    event.preventDefault();
+    lastElement.focus();
+  } else if (!event.shiftKey && document.activeElement === lastElement) {
+    event.preventDefault();
+    firstElement.focus();
+  }
+}
+
+function getSearchDialogFocusableElements() {
+  if (!searchModal || searchModal.hidden) {
+    return [];
+  }
+
+  return Array.from(searchModal.querySelectorAll("button"));
+}
+
 function handlePhrase(value, options = {}) {
   if (isStopPhrase(value)) {
     clearPhraseInput();
@@ -345,12 +611,12 @@ function handlePhrase(value, options = {}) {
 
   const parsed = parsePhrase(value);
 
-  if (!parsed || parsed.name === "Предмет") {
+  if (!parsed || parsed.name === "предмет") {
     if (options.fromSpeech) {
       hideStatus();
       speakError(value, lastParseError);
     } else {
-      showStatus("Не получилось разобрать срок. Пример: молоко до 5 июня");
+      showStatus("не получилось разобрать срок. пример: молоко до 5 июня");
       clearPhraseSoon();
     }
     return false;
@@ -358,7 +624,7 @@ function handlePhrase(value, options = {}) {
 
   if (hasDuplicateItem(parsed)) {
     playSavedSound();
-    showStatus(isSeriesActive ? "Такая запись уже есть. Можно сказать еще." : "Такая запись уже есть.");
+    showStatus(isSeriesActive ? "такая запись уже есть. можно сказать еще." : "такая запись уже есть.");
     clearPhraseSoon();
     return true;
   }
@@ -372,8 +638,8 @@ function handlePhrase(value, options = {}) {
   playSavedSound();
   showStatus(
     isSeriesActive
-      ? `Сохранено. ${formatReminderMessage(parsed)} Можно сказать еще.`
-      : `Сохранено. ${formatReminderMessage(parsed)}`,
+      ? `сохранено. ${formatReminderMessage(parsed)} можно сказать еще.`
+      : `сохранено. ${formatReminderMessage(parsed)}`,
   );
   clearPhraseSoon();
   scheduleItemNotifications(parsed);
@@ -399,7 +665,7 @@ function handleEditPhrase(value) {
   if (/^(удали|удалить|убери|убрать)(\s|$)/.test(phrase)) {
     deleteItem(item.id);
     finishEditing();
-    showStatus("Удалено", SHORT_MESSAGE_VISIBLE_MS);
+    showStatus("удалено", SHORT_MESSAGE_VISIBLE_MS);
     clearPhraseSoon();
     return "silent";
   }
@@ -409,8 +675,9 @@ function handleEditPhrase(value) {
   if (renamedItem) {
     updateItem(renamedItem);
     finishEditing();
+    refreshSearchDialog();
     playSavedSound();
-    showStatus("Исправлено.");
+    showStatus("изменено.");
     clearPhraseSoon();
     return true;
   }
@@ -425,14 +692,15 @@ function handleEditPhrase(value) {
 
   updateItem(correction);
   finishEditing();
+  refreshSearchDialog();
   playSavedSound();
-  showStatus(`Исправлено. ${formatReminderMessage(correction)}`);
+  showStatus(`изменено. ${formatReminderMessage(correction)}`);
   clearPhraseSoon();
   return true;
 }
 
 function getRenamedItem(item, phrase) {
-  const match = phrase.match(/(?:^|\s)(?:измени|изменить|исправь|исправить|поменяй|поменять)\s+название\s+на\s+(.+)$/);
+  const match = phrase.match(/(?:^|\s)(?:измени|изменить)\s+название\s+на\s+(.+)$/);
 
   if (!match) {
     return null;
@@ -447,142 +715,65 @@ function getRenamedItem(item, phrase) {
 
 function getCorrectedItem(item, value) {
   const isCommand = isCorrectionCommand(value);
-  const fullPhrase = isCommand ? null : parsePhrase(value);
+  const cleanedValue = getCorrectionTarget(value);
 
-  if (fullPhrase && fullPhrase.name !== "Предмет") {
-    return {
-      ...item,
-      name: fullPhrase.name,
-      date: fullPhrase.date,
-      time: fullPhrase.time,
-      source: value.trim(),
-      correctionBaseDate: undefined,
-      correctionBaseTime: undefined,
-    };
+  if (!isCommand || !cleanedValue) {
+    return null;
   }
 
-  const cleanedValue = cleanCorrectionCommand(value);
-  const relativeCorrection = getRelativeCorrectionItem(item, cleanedValue, value);
+  const parsedDate = parsePhrase(`${item.name} ${getCorrectionDateTarget(cleanedValue)}`);
 
-  if (relativeCorrection) {
-    return relativeCorrection;
-  }
-
-  const parsedDate = parsePhrase(`${item.name} ${cleanedValue}`);
-
-  if (parsedDate && parsedDate.name !== "Предмет") {
+  if (parsedDate && parsedDate.name !== "предмет") {
     return {
       ...item,
       date: parsedDate.date,
       time: parsedDate.time || parseCorrectionTime(cleanedValue) || item.time,
       source: value.trim(),
-      correctionBaseDate: undefined,
-      correctionBaseTime: undefined,
     };
   }
 
-  const time = parseTime(normalize(cleanedValue));
+  const time = parseCorrectionTime(cleanedValue);
 
   if (time) {
     return {
       ...item,
       time,
       source: value.trim(),
-      correctionBaseDate: undefined,
-      correctionBaseTime: undefined,
     };
   }
 
-  return null;
-}
-
-function getRelativeCorrectionItem(item, cleanedValue, sourceValue) {
-  const usePreviousCorrectionBase = isCorrectionUpdateCommand(sourceValue);
-  const correctionBase = usePreviousCorrectionBase
-    ? getCorrectionBaseItem(item)
-    : item;
-  const relative = parseRelativeCorrection(cleanedValue, parseItemDateTime(correctionBase));
-
-  if (!relative) {
-    return null;
-  }
-
-  const baseDate = usePreviousCorrectionBase && item.correctionBaseDate
-    ? item.correctionBaseDate
-    : item.date;
-  const baseTime = usePreviousCorrectionBase && item.correctionBaseTime !== undefined
-    ? item.correctionBaseTime
-    : item.time;
-
   return {
     ...item,
-    date: toIsoDate(relative.date),
-    time: ["minute", "hour"].includes(relative.unit)
-      ? `${String(relative.date.getHours()).padStart(2, "0")}:${String(relative.date.getMinutes()).padStart(2, "0")}`
-      : item.time,
-    source: sourceValue.trim(),
-    correctionBaseDate: baseDate,
-    correctionBaseTime: baseTime,
+    name: getParsedName(cleanedValue),
+    source: value.trim(),
   };
-}
-
-function getCorrectionBaseItem(item) {
-  if (!item.correctionBaseDate) {
-    return item;
-  }
-
-  return {
-    ...item,
-    date: item.correctionBaseDate,
-    time: item.correctionBaseTime,
-  };
-}
-
-function isCorrectionUpdateCommand(value) {
-  return /^(обнови|обновить)(\s|$)/.test(normalize(value));
-}
-
-function parseRelativeCorrection(value, baseDate) {
-  const phrase = normalize(value);
-  const halfYear = phrase.match(/^через\s+(полгода|пол\s+года|полгоду)/);
-
-  if (halfYear) {
-    return getRelativeDateByAmount(6, "месяц", 0, baseDate);
-  }
-
-  const singleUnitMatch = phrase.match(/^через\s+(минуту|час|день|неделю|месяц|год)/);
-
-  if (singleUnitMatch) {
-    return getRelativeDateByAmount(1, singleUnitMatch[1], 0, baseDate);
-  }
-
-  const amountWords = Object.keys(amountWordMap).sort((a, b) => b.length - a.length).join("|");
-  const spokenMatch = new RegExp(
-    `^через\\s+(${amountWords})\\s+(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет)`,
-  ).exec(phrase);
-
-  if (spokenMatch) {
-    return getRelativeDateByAmount(amountWordMap[spokenMatch[1]], spokenMatch[2], 0, baseDate);
-  }
-
-  const numberMatch = phrase.match(
-    /^через\s+(минуту|час|день|неделю|месяц|год|(\d+)\s*(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет))/,
-  );
-
-  if (!numberMatch) {
-    return null;
-  }
-
-  return getRelativeDateByAmount(
-    numberMatch[2] ? Number(numberMatch[2]) : 1,
-    numberMatch[3] || numberMatch[1],
-    0,
-    baseDate,
-  );
 }
 
 function isCorrectionCommand(value) {
-  return /^(перенеси|перенести|исправь|исправить|поставь|поставить|измени|изменить|обнови|обновить|поменяй|поменять)(\s|$)/.test(normalize(value));
+  return /^(измени|изменить)(\s|$)/.test(normalize(value));
+}
+
+function getCorrectionTarget(value) {
+  return normalize(value)
+    .replace(/^(измени|изменить)\s+/, "")
+    .replace(/^название\s+на\s+/, "")
+    .replace(/^дату\s+на\s+/, "")
+    .replace(/^срок\s+на\s+/, "")
+    .replace(/^время\s+на\s+/, "")
+    .replace(/^на\s+/, "")
+    .trim();
+}
+
+function getCorrectionDateTarget(value) {
+  if (isRelativeDateTarget(value)) {
+    return `через ${value}`;
+  }
+
+  return value;
+}
+
+function isRelativeDateTarget(value) {
+  return /^(\d+|один|одна|одну|одно|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять)\s+(день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет)$/.test(value);
 }
 
 function parseCorrectionTime(value) {
@@ -622,18 +813,6 @@ function parseCorrectionTime(value) {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
-function cleanCorrectionCommand(value) {
-  return normalize(value)
-    .replace(/^(перенеси|перенести|исправь|исправить|поставь|поставить|измени|изменить|обнови|обновить|поменяй|поменять)\s+/, "")
-    .replace(/^(дату|срок|время)\s+/, "")
-    .replace(/^на\s+(?=(сегодня|завтра|послезавтра))/g, "")
-    .replace(/^на\s+(?=(минуту|час|день|неделю|месяц|год))/g, "через ")
-    .replace(/^на\s+(?=\d+\s*(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет))/g, "через ")
-    .replace(/^на\s+(?=(один|одна|одну|одно|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять)\s+(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет))/g, "через ")
-    .replace(/^на\s+(?=\d{1,2}\s+(январь|январе|января|феврале|февраль|февраля|март|марте|марта|апрель|апреле|апреля|май|мае|мая|июнь|июне|июня|июль|июле|июля|август|августе|августа|сентябрь|сентябре|сентября|октябрь|октябре|октября|ноябрь|ноябре|ноября|декабрь|декабре|декабря))/g, "")
-    .trim();
-}
-
 function updateItem(updatedItem) {
   items = sortByDate(items.map((item) => (
     item.id === updatedItem.id ? updatedItem : item
@@ -658,17 +837,30 @@ function cancelEditing() {
   renderList();
 }
 
+function cancelSearch() {
+  isSearchActive = false;
+
+  if (searchButton) {
+    searchButton.classList.remove("is-listening");
+  }
+
+  if (startButton) {
+    startButton.classList.remove("is-listening");
+  }
+}
+
 function startEditingItem(id) {
   if (!recognition) {
-    showStatus("Голос может быть недоступен в этом браузере");
+    showStatus("голос может быть недоступен в этом браузере");
     return;
   }
 
+  cancelSearch();
   editingItemId = id;
   isSeriesActive = false;
   clearEditButtonFocus(id);
   startButton.classList.add("is-listening");
-  showStatus("Скажи команду исправления");
+  showStatus("скажи команду изменения");
   restartRecognition();
 }
 
@@ -700,14 +892,15 @@ function isStopPhrase(value) {
 
 function startSeriesListening() {
   if (!recognition) {
-    showStatus("Скажи или напиши одной фразой: страховка до 15 июля");
+    showStatus("скажи или напиши одной фразой: страховка до 15 июля");
     return;
   }
 
   cancelEditing();
+  cancelSearch();
   isSeriesActive = true;
   startButton.classList.add("is-listening");
-  showStatus("Слушаю. Можно сказать несколько фраз.");
+  showStatus("слушаю. можно сказать несколько фраз.");
   lastErrorPhrase = "";
   restartRecognition();
 }
@@ -731,7 +924,7 @@ function startRecognition() {
   } catch (error) {
     isRecognitionRunning = false;
     startButton.classList.remove("is-listening");
-    showStatus("Голос не запустился. Обнови страницу и нажми старт еще раз.");
+    showStatus("голос не запустился. обнови страницу и нажми старт еще раз.");
   }
 }
 
@@ -1358,12 +1551,16 @@ function cleanName(name) {
       .replace(/(?:в\s+)?(?:следующий|следующая|следующее|следующей)?\s*(понедельник|понедельника|вторник|вторника|среду|среда|среды|четверг|четверга|пятницу|пятница|пятницы|субботу|суббота|субботы|воскресенье|воскресенья)/g, "")
       .replace(/[.,!?]+/g, "")
       .trim()
-      .replace(/^./, (letter) => letter.toUpperCase()) || "Предмет"
+      || "предмет"
   );
 }
 
 function normalize(value) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function formatDisplayName(value) {
+  return value.toLocaleLowerCase("ru-RU");
 }
 
 function renderList() {
@@ -1374,7 +1571,7 @@ function renderList() {
   if (!items.length) {
     const empty = document.createElement("p");
     empty.className = "empty";
-    empty.textContent = "Пока ничего нет";
+    empty.textContent = "пока ничего нет";
     list.append(empty);
     return;
   }
@@ -1414,19 +1611,19 @@ function renderList() {
     deleteButton.type = "button";
     editButton.dataset.itemId = item.id;
 
-    name.textContent = item.name;
+    name.textContent = formatDisplayName(item.name);
     visibleDate.textContent = formatDate(item.date, item.time);
     visibleDate.setAttribute("aria-hidden", "true");
     screenReaderDate.textContent = formatDateLabel(item.date, item.time);
     visibleDays.textContent = formatDaysLeftVisible(item.date);
     visibleDays.setAttribute("aria-hidden", "true");
     screenReaderDays.textContent = formatDaysLeftLabel(item.date);
-    visibleEditText.textContent = "Исправить";
+    visibleEditText.textContent = "изменить";
     visibleEditText.setAttribute("aria-hidden", "true");
-    screenReaderEditText.textContent = `Исправить напоминание ${item.name}`;
-    visibleDeleteText.textContent = "Удалить";
+    screenReaderEditText.textContent = `изменить напоминание ${formatDisplayName(item.name)}`;
+    visibleDeleteText.textContent = "удалить";
     visibleDeleteText.setAttribute("aria-hidden", "true");
-    screenReaderDeleteText.textContent = `Удалить напоминание ${item.name}`;
+    screenReaderDeleteText.textContent = `удалить напоминание ${formatDisplayName(item.name)}`;
     editButton.addEventListener("click", () => {
       startEditingItem(item.id);
     });
@@ -1447,10 +1644,10 @@ function renderList() {
 
 function getListLabel() {
   if (!items.length) {
-    return "Список пуст.";
+    return "список пуст.";
   }
 
-  return "Список напоминаний.";
+  return "список напоминаний.";
 }
 
 function deleteItem(id) {
@@ -1458,7 +1655,7 @@ function deleteItem(id) {
   saveItems();
   renderList();
   scheduleAllNotifications();
-  showStatus("Удалено", SHORT_MESSAGE_VISIBLE_MS);
+  showStatus("удалено", SHORT_MESSAGE_VISIBLE_MS);
 }
 
 function setupSpeech() {
@@ -1467,7 +1664,7 @@ function setupSpeech() {
 
   if (!SpeechRecognition) {
     showStatus(
-      "Голос может быть недоступен в этом браузере, фразу можно написать",
+      "голос может быть недоступен в этом браузере, фразу можно написать",
     );
     return;
   }
@@ -1482,7 +1679,10 @@ function setupSpeech() {
     const phrase = event.results[0][0].transcript;
 
     if (isStopPhrase(phrase)) {
-      if (editingItemId) {
+      if (isSearchActive) {
+        cancelSearch();
+        hideStatus();
+      } else if (editingItemId) {
         handleEditPhrase(phrase);
       } else {
         handlePhrase(phrase, { fromSpeech: true });
@@ -1490,13 +1690,15 @@ function setupSpeech() {
       return;
     }
 
-    const result = editingItemId
-      ? handleEditPhrase(phrase)
-      : handlePhrase(phrase, { fromSpeech: true });
+    const result = isSearchActive
+      ? handleSearchPhrase(phrase)
+      : editingItemId
+        ? handleEditPhrase(phrase)
+        : handlePhrase(phrase, { fromSpeech: true });
 
     if (result !== false && result !== "silent") {
       showRecognizedPhrase(phrase);
-      announceToScreenReader(`Распознано: ${phrase}`);
+      announceToScreenReader(`распознано: ${phrase}`);
     }
 
     if (!isSeriesActive && result !== false) {
@@ -1514,6 +1716,9 @@ function setupSpeech() {
 
     if (!isSeriesActive) {
       startButton.classList.remove("is-listening");
+      if (searchButton) {
+        searchButton.classList.remove("is-listening");
+      }
       return;
     }
 
@@ -1530,6 +1735,9 @@ function setupSpeech() {
 
     if (!isSeriesActive) {
       startButton.classList.remove("is-listening");
+      if (searchButton) {
+        searchButton.classList.remove("is-listening");
+      }
     }
 
     showStatus(getRecognitionErrorMessage());
@@ -1538,23 +1746,27 @@ function setupSpeech() {
 
 function getRecognitionErrorMessage() {
   if (editingItemId) {
-    return "Голос не сработал. Нажми исправить еще раз";
+    return "голос не сработал. нажми изменить еще раз";
   }
 
-  return "Голос не сработал. Нажми старт еще раз";
+  if (isSearchActive) {
+    return "голос не сработал. нажми поиск еще раз";
+  }
+
+  return "голос не сработал. нажми старт еще раз";
 }
 
 async function requestNotificationPermission() {
   if (!("Notification" in window)) {
-    showNotifyStatus("Этот браузер не поддерживает уведомления");
+    showNotifyStatus("этот браузер не поддерживает уведомления");
     return;
   }
 
   const permission = await Notification.requestPermission();
   showNotifyStatus(
     permission === "granted"
-      ? "Уведомления включены"
-      : "Уведомления не включены",
+      ? "уведомления включены"
+      : "уведомления не включены",
   );
 }
 
@@ -1645,14 +1857,14 @@ function speakError(value, reason = "") {
 
 function getErrorMessage(reason) {
   if (reason === "invalid-leap-day") {
-    return "Нет такой даты в этом году";
+    return "нет такой даты в этом году";
   }
 
   if (reason === "invalid-month-day") {
-    return "Нет такой даты в этом месяце";
+    return "нет такой даты в этом месяце";
   }
 
-  return "Не разобрала, повторите";
+  return "не разобрала, повторите";
 }
 
 function speak(message) {
@@ -1870,8 +2082,8 @@ function scheduleNotification(item, notificationTime) {
   }
 
   const timerId = setTimeout(() => {
-    new Notification("Напоминание", {
-      body: `${item.name}: ${formatDate(item.date, item.time)}`,
+    new Notification("напоминание", {
+      body: `${formatDisplayName(item.name)}: ${formatDate(item.date, item.time)}`,
     });
 
     if (isAlarmItem(item)) {
@@ -1932,11 +2144,11 @@ function formatDaysLeftLabel(value) {
   const daysText = formatDaysLeft(value);
 
   if (daysText === "сегодня") {
-    return "Срок сегодня";
+    return "срок сегодня";
   }
 
   if (daysText === "просрочено") {
-    return "Срок просрочен";
+    return "срок просрочен";
   }
 
   const spokenDaysText = formatDaysLeftSpoken(value);
@@ -1946,8 +2158,12 @@ function formatDaysLeftLabel(value) {
 function formatDaysLeftVisible(value) {
   const daysText = formatDaysLeft(value);
 
-  if (daysText === "сегодня" || daysText === "просрочено") {
-    return daysText;
+  if (daysText === "сегодня") {
+    return "сегодня";
+  }
+
+  if (daysText === "просрочено") {
+    return "просрочено";
   }
 
   return `${getRemainingPrefix(daysText)} ${daysText}`;
@@ -1955,8 +2171,8 @@ function formatDaysLeftVisible(value) {
 
 function getRemainingPrefix(value) {
   return value.startsWith("1 день") || value.startsWith("один ")
-    ? "Остался"
-    : "Осталось";
+    ? "остался"
+    : "осталось";
 }
 
 function formatDaysLeftSpoken(value) {
@@ -2118,26 +2334,26 @@ function getReminderPlan(value) {
 
 function formatReminderMessage(item) {
   if (isAlarmItem(item)) {
-    return "Будильник прозвонит в указанное время.";
+    return "будильник прозвонит в указанное время.";
   }
 
   if (item.time) {
     if (isSoonTimedEvent(parseItemDateTime(item))) {
-      return "Напомню в указанное время.";
+      return "напомню в указанное время.";
     }
 
-    return "Напомню накануне вечером, заранее и в указанное время.";
+    return "напомню накануне вечером, заранее и в указанное время.";
   }
 
   const reminders = getReminderPlan(item.date);
 
   if (!reminders.length) {
     return getDaysLeft(item.date) === 0
-      ? "Напомню сегодня."
-      : "Срок уже прошел.";
+      ? "напомню сегодня."
+      : "срок уже прошел.";
   }
 
-  return `Напомню ${formatList(reminders)}.`;
+  return `напомню ${formatList(reminders)}.`;
 }
 
 function formatList(values) {
