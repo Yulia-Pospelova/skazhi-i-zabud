@@ -223,6 +223,7 @@ let isSearchActive = false;
 let searchReturnFocus = null;
 let currentSearchItemIds = [];
 let currentSearchQuery = "";
+let previousPageOverflow = "";
 let notificationTimers = [];
 let isSeriesActive = false;
 let lastErrorSpokenAt = 0;
@@ -466,9 +467,24 @@ function showSearchDialog(matches, query) {
   });
 
   searchModal.hidden = false;
+  lockPageScroll();
   searchCloseButton.focus();
   showStatus(`найдено: ${matches.length}`);
   announceToScreenReader(`найдено по запросу ${query}: ${matches.length}`);
+}
+
+function lockPageScroll() {
+  if (document.body.style.overflow === "hidden") {
+    return;
+  }
+
+  previousPageOverflow = document.body.style.overflow;
+  document.body.style.overflow = "hidden";
+}
+
+function unlockPageScroll() {
+  document.body.style.overflow = previousPageOverflow;
+  previousPageOverflow = "";
 }
 
 function createSearchResult(item) {
@@ -532,6 +548,7 @@ function closeSearchDialog(options = {}) {
   }
 
   searchModal.hidden = true;
+  unlockPageScroll();
 
   if (searchResults) {
     searchResults.innerHTML = "";
@@ -1550,6 +1567,7 @@ function cleanName(name) {
       .replace(/\b(?:в|на)\s+\d{1,2}(?::\d{2}|\s*(?:часа?|часов)(?:\s*(?:и\s*)?\d{1,2}\s*(?:минут|минуты|минута))?)?\s*(утра|вечера|дня|ночи)?/g, "")
       .replace(/(?:в\s+)?(?:следующий|следующая|следующее|следующей)?\s*(понедельник|понедельника|вторник|вторника|среду|среда|среды|четверг|четверга|пятницу|пятница|пятницы|субботу|суббота|субботы|воскресенье|воскресенья)/g, "")
       .replace(/[.,!?]+/g, "")
+      .replace(/\bна\s*$/g, "")
       .trim()
       || "предмет"
   );
