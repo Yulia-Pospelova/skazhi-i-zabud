@@ -343,6 +343,7 @@ h1 {
 .item-days {
   align-self: center;
   min-inline-size: 88px;
+  margin-top: 6px;
   padding: 10px 12px;
   border-radius: var(--radius);
   color: var(--color-text);
@@ -434,6 +435,7 @@ h1 {
 
 .search-close-button,
 .examples-close-button,
+.search-ok-button,
 .search-result-close-button {
   min-block-size: 42px;
   padding: 0 12px;
@@ -449,6 +451,11 @@ h1 {
 
 .search-result-close-button {
   inline-size: 100%;
+}
+
+.search-ok-button {
+  inline-size: 100%;
+  margin-top: 12px;
 }
 
 .search-results {
@@ -477,7 +484,7 @@ h1 {
 }
 
 .search-result-days {
-  margin: 8px 0 0;
+  margin: 12px 0 0;
   padding: 10px 12px;
   border-radius: var(--radius);
   color: var(--color-text);

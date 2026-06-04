@@ -14,6 +14,7 @@ let searchModal = null;
 let searchResults = null;
 let searchTitle = null;
 let searchCloseButton = null;
+let searchOkButton = null;
 let list = null;
 
 const STORAGE_KEY = "expiry-reminders";
@@ -287,6 +288,10 @@ function initApp() {
       searchCloseButton.addEventListener("click", closeSearchDialog);
     }
 
+    if (searchOkButton) {
+      searchOkButton.addEventListener("click", closeSearchDialog);
+    }
+
     if (searchModal) {
       searchModal.addEventListener("click", (event) => {
         if (event.target === searchModal) {
@@ -330,6 +335,7 @@ function assignElements() {
   searchResults = document.querySelector(".search-results");
   searchTitle = document.querySelector("#search-dialog-title");
   searchCloseButton = document.querySelector(".search-close-button");
+  searchOkButton = document.querySelector(".search-ok-button");
   list = document.querySelector(".list");
 }
 
@@ -619,6 +625,7 @@ function closeSearchDialog(options = {}) {
 
   currentSearchItemIds = [];
   currentSearchQuery = "";
+  editingItemId = null;
 
   if (restoreFocus && searchReturnFocus && typeof searchReturnFocus.focus === "function") {
     searchReturnFocus.focus();
@@ -637,9 +644,9 @@ function refreshSearchDialog() {
     return;
   }
 
-  const matches = sortByDate(items.filter((item) => (
-    currentSearchItemIds.includes(item.id)
-  )));
+  const matches = currentSearchItemIds
+    .map((id) => items.find((item) => item.id === id))
+    .filter(Boolean);
   searchResults.innerHTML = "";
 
   if (!matches.length) {
@@ -653,6 +660,10 @@ function refreshSearchDialog() {
     searchResults.append(createSearchResult(item));
   });
   announceToScreenReader(`обновлено: ${matches.length}`);
+}
+
+function isSearchDialogOpen() {
+  return Boolean(searchModal && !searchModal.hidden);
 }
 
 function keepFocusInsideSearchDialog(event) {
@@ -747,10 +758,10 @@ function handleEditPhrase(value) {
 
   const phrase = normalize(value);
 
-  if (/^(удали|удалить|убери|убрать)(\s|$)/.test(phrase)) {
+  if (isDeleteCorrectionCommand(phrase)) {
     deleteItem(item.id);
     finishEditing();
-    showStatus("удалено", SHORT_MESSAGE_VISIBLE_MS);
+    refreshSearchDialog();
     clearPhraseSoon();
     return "silent";
   }
@@ -759,8 +770,10 @@ function handleEditPhrase(value) {
 
   if (renamedItem) {
     updateItem(renamedItem);
-    finishEditing();
     refreshSearchDialog();
+    if (!isSearchDialogOpen()) {
+      finishEditing();
+    }
     playSavedSound();
     showStatus("изменено.");
     clearPhraseSoon();
@@ -776,8 +789,10 @@ function handleEditPhrase(value) {
   }
 
   updateItem(correction);
-  finishEditing();
   refreshSearchDialog();
+  if (!isSearchDialogOpen()) {
+    finishEditing();
+  }
   playSavedSound();
   showStatus(`изменено. ${formatReminderMessage(correction)}`);
   clearPhraseSoon();
@@ -785,7 +800,7 @@ function handleEditPhrase(value) {
 }
 
 function getRenamedItem(item, phrase) {
-  const match = phrase.match(/(?:^|\s)(?:измени|изменить)\s+название\s+на\s+(.+)$/);
+  const match = phrase.match(/(?:^|\s)(?:измени|изменить)\s+название(?:\s+на)?\s+(.+)$/);
 
   if (!match) {
     return null;
@@ -800,61 +815,123 @@ function getRenamedItem(item, phrase) {
 
 function getCorrectedItem(item, value) {
   const isCommand = isCorrectionCommand(value);
+  const commandType = getCorrectionCommandType(value);
   const cleanedValue = getCorrectionTarget(value);
 
   if (!isCommand || !cleanedValue) {
     return null;
   }
 
+  if (!commandType) {
+    return null;
+  }
+
+  if (commandType === "name") {
+    return {
+      ...item,
+      name: getParsedName(cleanedValue),
+      source: value.trim(),
+    };
+  }
+
+  if (commandType === "time") {
+    const period = parseDayPeriod(cleanedValue);
+    const time = parseCorrectionTime(cleanedValue);
+
+    if (period) {
+      return {
+        ...item,
+        time: "",
+        period,
+        source: value.trim(),
+      };
+    }
+
+    if (time) {
+      return {
+        ...item,
+        time,
+        period: "",
+        source: value.trim(),
+      };
+    }
+
+    return null;
+  }
+
+  if (commandType !== "date") {
+    return null;
+  }
+
   const parsedDate = parsePhrase(`${item.name} ${getCorrectionDateTarget(cleanedValue)}`);
 
   if (parsedDate && parsedDate.name !== "предмет") {
-    const correctedTime = parsedDate.time || parseCorrectionTime(cleanedValue) || (parsedDate.period ? "" : item.time);
+    const explicitTime = parsedDate.time || parseCorrectionTime(cleanedValue) || "";
+    const correctedTime = explicitTime || item.time || "";
+    const correctedPeriod = explicitTime ? "" : (parsedDate.period || item.period || "");
 
     return {
       ...item,
       date: parsedDate.date,
       time: correctedTime,
-      period: parsedDate.period || "",
+      period: correctedPeriod,
       displayDate: parsedDate.displayDate || "",
       source: value.trim(),
     };
   }
 
-  const time = parseCorrectionTime(cleanedValue);
-
-  if (time) {
-    return {
-      ...item,
-      time,
-      period: "",
-      source: value.trim(),
-    };
-  }
-
-  return {
-    ...item,
-    name: getParsedName(cleanedValue),
-    source: value.trim(),
-  };
+  return null;
 }
 
 function isCorrectionCommand(value) {
   return /^(измени|изменить)(\s|$)/.test(normalize(value));
 }
 
+function isDeleteCorrectionCommand(phrase) {
+  const cleanedPhrase = normalize(phrase).replace(/[.,!?]+/g, "");
+
+  return /^(удали|удалить|убери|убрать)(\s|$)/.test(cleanedPhrase) ||
+    /^(нужно\s+)?удалить(\s+запись|\s+напоминание)?$/.test(cleanedPhrase);
+}
+
+function getCorrectionCommandType(value) {
+  const phrase = normalize(value).replace(/^(измени|изменить)\s+/, "");
+
+  if (/^название(?:\s|$)/.test(phrase)) {
+    return "name";
+  }
+
+  if (/^(дату|дата|срок)(?:\s|$)/.test(phrase)) {
+    return "date";
+  }
+
+  if (/^время(?:\s|$)/.test(phrase)) {
+    return "time";
+  }
+
+  return "";
+}
+
 function getCorrectionTarget(value) {
   return normalize(value)
     .replace(/^(измени|изменить)\s+/, "")
-    .replace(/^название\s+на\s+/, "")
-    .replace(/^дату\s+на\s+/, "")
-    .replace(/^срок\s+на\s+/, "")
-    .replace(/^время\s+на\s+/, "")
+    .replace(/^название(?:\s+на)?\s+/, "")
+    .replace(/^дат[ау](?:\s+на)?\s+/, "")
+    .replace(/^срок(?:\s+на)?\s+/, "")
+    .replace(/^время(?:\s+на)?\s+/, "")
     .replace(/^на\s+/, "")
     .trim();
 }
 
 function getCorrectionDateTarget(value) {
+  if (/^следующ(?:ий|его|ем)\s+год(?:а|у)?$/.test(value)) {
+    return "в следующем году";
+  }
+
+  if (/^следующ(?:ий|его|ем)\s+месяц(?:а|е)?$/.test(value)) {
+    return "в следующем месяце";
+  }
+
   if (isRelativeDateTarget(value)) {
     return `через ${value}`;
   }
@@ -2269,12 +2346,10 @@ function formatDate(value, time) {
 }
 
 function formatItemDate(item) {
-  if (item.displayDate) {
-    return item.period && !item.time ? `${item.displayDate} ${item.period}` : item.displayDate;
-  }
+  const dateText = getItemDateText(item);
+  const timeText = getItemTimeText(item);
 
-  const dateText = formatDate(item.date, item.time);
-  return item.period && !item.time ? `${dateText} ${item.period}` : dateText;
+  return timeText ? `${dateText} ${timeText}` : dateText;
 }
 
 function formatDateLabel(value, time) {
@@ -2284,12 +2359,36 @@ function formatDateLabel(value, time) {
 }
 
 function formatItemDateLabel(item) {
+  const dateText = getItemDateLabelText(item);
+  const timeText = getItemTimeText(item);
+
+  return timeText ? `${dateText} ${timeText}` : dateText;
+}
+
+function getItemDateText(item) {
   if (item.displayDate) {
-    return item.period && !item.time ? `${item.displayDate} ${item.period}` : item.displayDate;
+    return item.displayDate;
   }
 
-  const dateText = formatDateLabel(item.date, item.time);
-  return item.period && !item.time ? `${dateText} ${item.period}` : dateText;
+  const date = parseIsoDate(item.date);
+  return `${date.getDate()} ${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+function getItemDateLabelText(item) {
+  if (item.displayDate) {
+    return item.displayDate;
+  }
+
+  const date = parseIsoDate(item.date);
+  return `${date.getDate()} ${monthNames[date.getMonth()]} ${date.getFullYear()} года`;
+}
+
+function getItemTimeText(item) {
+  if (item.time) {
+    return item.time;
+  }
+
+  return item.period || "";
 }
 
 function formatDaysLeft(value) {
