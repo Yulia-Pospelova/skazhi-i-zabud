@@ -81,7 +81,7 @@ h1 {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 14px;
+  margin-bottom: 6px;
 }
 
 .start-hint {
@@ -95,14 +95,11 @@ h1 {
   display: grid;
   gap: 8px;
   margin-bottom: 0;
-  padding: 12px;
-  border-radius: var(--radius);
   color: var(--color-muted);
-  background: var(--color-soft);
   font-size: 16px;
 }
 
-.examples-panel[hidden] {
+.examples-modal[hidden] {
   display: none;
 }
 
@@ -391,7 +388,8 @@ h1 {
   color: var(--color-muted);
 }
 
-.search-modal {
+.search-modal,
+.examples-modal {
   position: fixed;
   inset: 0;
   z-index: 10;
@@ -402,11 +400,13 @@ h1 {
   background: rgba(13, 21, 17, 0.42);
 }
 
-.search-modal[hidden] {
+.search-modal[hidden],
+.examples-modal[hidden] {
   display: none;
 }
 
-.search-dialog {
+.search-dialog,
+.examples-dialog {
   inline-size: min(560px, 100%);
   max-block-size: min(82dvb, 720px);
   padding: 16px;
@@ -417,7 +417,8 @@ h1 {
   background: var(--color-surface);
 }
 
-.search-dialog-head {
+.search-dialog-head,
+.examples-dialog-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -425,12 +426,14 @@ h1 {
   margin-bottom: 12px;
 }
 
-.search-dialog h2 {
+.search-dialog h2,
+.examples-dialog h2 {
   margin: 0;
   font-size: 22px;
 }
 
 .search-close-button,
+.examples-close-button,
 .search-result-close-button {
   min-block-size: 42px;
   padding: 0 12px;
@@ -537,6 +540,7 @@ h1 {
   .hero-actions {
     align-items: stretch;
     flex-direction: column;
+    margin-bottom: 4px;
   }
 
   .examples-button,

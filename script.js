@@ -6,10 +6,13 @@ let notifyButton = null;
 let notifyStatus = null;
 let examplesButton = null;
 let examplesPanel = null;
+let examplesModal = null;
+let examplesCloseButton = null;
 let clearButton = null;
 let searchButton = null;
 let searchModal = null;
 let searchResults = null;
+let searchTitle = null;
 let searchCloseButton = null;
 let list = null;
 
@@ -224,6 +227,7 @@ let searchReturnFocus = null;
 let currentSearchItemIds = [];
 let currentSearchQuery = "";
 let previousPageOverflow = "";
+let examplesReturnFocus = null;
 let notificationTimers = [];
 let isSeriesActive = false;
 let lastErrorSpokenAt = 0;
@@ -263,7 +267,7 @@ function initApp() {
     }
 
     if (examplesButton) {
-      examplesButton.addEventListener("click", toggleExamples);
+      examplesButton.addEventListener("click", openExamplesDialog);
     }
 
     if (clearButton) {
@@ -291,6 +295,18 @@ function initApp() {
       });
     }
 
+    if (examplesCloseButton) {
+      examplesCloseButton.addEventListener("click", closeExamplesDialog);
+    }
+
+    if (examplesModal) {
+      examplesModal.addEventListener("click", (event) => {
+        if (event.target === examplesModal) {
+          closeExamplesDialog();
+        }
+      });
+    }
+
     document.addEventListener("keydown", handleDocumentKeydown);
   } catch (error) {
     console.error("App init failed", error);
@@ -306,10 +322,13 @@ function assignElements() {
   notifyStatus = document.querySelector(".notify-status");
   examplesButton = document.querySelector(".examples-button");
   examplesPanel = document.querySelector(".examples-panel");
+  examplesModal = document.querySelector(".examples-modal");
+  examplesCloseButton = document.querySelector(".examples-close-button");
   clearButton = document.querySelector(".clear-button");
   searchButton = document.querySelector(".search-button");
   searchModal = document.querySelector(".search-modal");
   searchResults = document.querySelector(".search-results");
+  searchTitle = document.querySelector("#search-dialog-title");
   searchCloseButton = document.querySelector(".search-close-button");
   list = document.querySelector(".list");
 }
@@ -374,19 +393,52 @@ function startSearchListening() {
   restartRecognition();
 }
 
-function toggleExamples() {
-  if (!examplesPanel || !examplesButton) {
+function openExamplesDialog() {
+  if (!examplesModal || !examplesButton || !examplesCloseButton) {
     return;
   }
 
-  const isOpen = !examplesPanel.hidden;
-  examplesPanel.hidden = isOpen;
-  examplesButton.setAttribute("aria-expanded", String(!isOpen));
+  examplesReturnFocus = document.activeElement;
+  examplesModal.hidden = false;
+  examplesButton.setAttribute("aria-expanded", "true");
+  lockPageScroll();
+  examplesCloseButton.focus();
+}
+
+function closeExamplesDialog(options = {}) {
+  const { restoreFocus = true } = options;
+
+  if (!examplesModal) {
+    return;
+  }
+
+  examplesModal.hidden = true;
+  unlockPageScroll();
+
+  if (examplesButton) {
+    examplesButton.setAttribute("aria-expanded", "false");
+  }
+
+  if (restoreFocus && examplesReturnFocus && typeof examplesReturnFocus.focus === "function") {
+    examplesReturnFocus.focus();
+  }
+
+  examplesReturnFocus = null;
 }
 
 function handleDocumentKeydown(event) {
+  if (event.key === "Escape" && examplesModal && !examplesModal.hidden) {
+    closeExamplesDialog();
+    return;
+  }
+
   if (event.key === "Escape" && searchModal && !searchModal.hidden) {
     closeSearchDialog();
+    return;
+  }
+
+  if (event.key === "Tab" && examplesModal && !examplesModal.hidden) {
+    keepFocusInsideDialog(event, examplesModal);
     return;
   }
 
@@ -467,10 +519,19 @@ function showSearchDialog(matches, query) {
   });
 
   searchModal.hidden = false;
+  updateSearchTitle(matches.length);
   lockPageScroll();
   searchCloseButton.focus();
   showStatus(`найдено: ${matches.length}`);
   announceToScreenReader(`найдено по запросу ${query}: ${matches.length}`);
+}
+
+function updateSearchTitle(count) {
+  if (!searchTitle) {
+    return;
+  }
+
+  searchTitle.textContent = `найдено: ${count}`;
 }
 
 function lockPageScroll() {
@@ -515,7 +576,7 @@ function createSearchResult(item) {
   closeButton.setAttribute("aria-label", `убрать из окна напоминание ${formatDisplayName(item.name)}`);
 
   name.textContent = formatDisplayName(item.name);
-  date.textContent = formatDate(item.date, item.time);
+  date.textContent = formatItemDate(item);
   days.textContent = formatDaysLeftVisible(item.date);
   editButton.textContent = "изменить";
   deleteButton.textContent = "удалить";
@@ -554,6 +615,8 @@ function closeSearchDialog(options = {}) {
     searchResults.innerHTML = "";
   }
 
+  updateSearchTitle(0);
+
   currentSearchItemIds = [];
   currentSearchQuery = "";
 
@@ -585,6 +648,7 @@ function refreshSearchDialog() {
   }
 
   currentSearchItemIds = matches.map((item) => item.id);
+  updateSearchTitle(matches.length);
   matches.forEach((item) => {
     searchResults.append(createSearchResult(item));
   });
@@ -592,7 +656,11 @@ function refreshSearchDialog() {
 }
 
 function keepFocusInsideSearchDialog(event) {
-  const focusable = getSearchDialogFocusableElements();
+  keepFocusInsideDialog(event, searchModal);
+}
+
+function keepFocusInsideDialog(event, dialogRoot) {
+  const focusable = getDialogFocusableElements(dialogRoot);
 
   if (!focusable.length) {
     return;
@@ -610,12 +678,12 @@ function keepFocusInsideSearchDialog(event) {
   }
 }
 
-function getSearchDialogFocusableElements() {
-  if (!searchModal || searchModal.hidden) {
+function getDialogFocusableElements(dialogRoot) {
+  if (!dialogRoot || dialogRoot.hidden) {
     return [];
   }
 
-  return Array.from(searchModal.querySelectorAll("button"));
+  return Array.from(dialogRoot.querySelectorAll("button, [href], input, textarea, select, [tabindex]:not([tabindex='-1'])"));
 }
 
 function handlePhrase(value, options = {}) {
@@ -741,10 +809,14 @@ function getCorrectedItem(item, value) {
   const parsedDate = parsePhrase(`${item.name} ${getCorrectionDateTarget(cleanedValue)}`);
 
   if (parsedDate && parsedDate.name !== "предмет") {
+    const correctedTime = parsedDate.time || parseCorrectionTime(cleanedValue) || (parsedDate.period ? "" : item.time);
+
     return {
       ...item,
       date: parsedDate.date,
-      time: parsedDate.time || parseCorrectionTime(cleanedValue) || item.time,
+      time: correctedTime,
+      period: parsedDate.period || "",
+      displayDate: parsedDate.displayDate || "",
       source: value.trim(),
     };
   }
@@ -755,6 +827,7 @@ function getCorrectedItem(item, value) {
     return {
       ...item,
       time,
+      period: "",
       source: value.trim(),
     };
   }
@@ -893,7 +966,9 @@ function hasDuplicateItem(newItem) {
   return items.some((item) => (
     normalize(item.name) === normalize(newItem.name) &&
     item.date === newItem.date &&
-    (item.time || "") === (newItem.time || "")
+    (item.time || "") === (newItem.time || "") &&
+    (item.period || "") === (newItem.period || "") &&
+    (item.displayDate || "") === (newItem.displayDate || "")
   ));
 }
 
@@ -973,6 +1048,7 @@ function parsePhrase(value) {
   }
 
   const time = parseTime(phrase);
+  const period = time ? "" : parseDayPeriod(phrase);
   const relative = parseRelativeDate(phrase);
   const yearOnly = parseYearOnlyDate(phrase);
   if (yearOnly) {
@@ -981,6 +1057,8 @@ function parsePhrase(value) {
       name: getParsedName(phrase.slice(0, yearOnly.index)),
       date: toIsoDate(yearOnly.date),
       time: null,
+      period,
+      displayDate: yearOnly.displayDate,
       source: value.trim(),
     };
   }
@@ -993,6 +1071,8 @@ function parsePhrase(value) {
       name: getParsedName(phrase.slice(0, approximate.index)),
       date: toIsoDate(approximate.date),
       time: parsedTime,
+      period,
+      displayDate: approximate.displayDate,
       source: value.trim(),
     };
   }
@@ -1004,6 +1084,7 @@ function parsePhrase(value) {
       name: getParsedName(phrase.slice(0, weekday.index)),
       date: toIsoDate(weekday.date),
       time: parsedTime,
+      period,
       source: value.trim(),
     };
   }
@@ -1017,6 +1098,8 @@ function parsePhrase(value) {
       name,
       date: toIsoDate(exact.date),
       time: parsedTime,
+      period,
+      displayDate: exact.displayDate,
       source: value.trim(),
     };
   }
@@ -1030,6 +1113,7 @@ function parsePhrase(value) {
       name,
       date: toIsoDate(named.date),
       time: parsedTime,
+      period,
       source: value.trim(),
     };
   }
@@ -1042,6 +1126,7 @@ function parsePhrase(value) {
       name,
       date: toIsoDate(relative.date),
       time: parsedTime,
+      period,
       source: value.trim(),
     };
   }
@@ -1150,7 +1235,33 @@ function parseYearOnlyDate(phrase) {
     return null;
   }
 
-  return { date: new Date(year, 0, 1), index: match.index };
+  return {
+    date: new Date(year, 0, 1),
+    index: match.index,
+    displayDate: normalize(match[0]),
+  };
+}
+
+function parseDayPeriod(phrase) {
+  const match = phrase.match(/(?:^|\s)(утром|утро|днем|днём|день|вечером|вечер|ночью|ночь)(?:\s|$)/);
+
+  if (!match) {
+    return "";
+  }
+
+  if (match[1] === "утром" || match[1] === "утро") {
+    return "утром";
+  }
+
+  if (match[1] === "днем" || match[1] === "днём" || match[1] === "день") {
+    return "днём";
+  }
+
+  if (match[1] === "вечером" || match[1] === "вечер") {
+    return "вечером";
+  }
+
+  return "ночью";
 }
 
 function getRelativeUnit(unit) {
@@ -1213,7 +1324,11 @@ function parseNextYearDate(phrase) {
     return null;
   }
 
-  return { date: new Date(new Date().getFullYear() + 1, 0, 1), index: match.index };
+  return {
+    date: new Date(new Date().getFullYear() + 1, 0, 1),
+    index: match.index,
+    displayDate: normalize(match[0]),
+  };
 }
 
 function parseYearPartDate(phrase) {
@@ -1237,13 +1352,17 @@ function parseYearPartDate(phrase) {
     day = 1;
   }
 
-  let date = new Date(now.getFullYear() + (match[2] ? 1 : 0), month, day);
+  let year = now.getFullYear() + (match[2] ? 1 : 0);
+  let date = new Date(year, month, day);
+  let displayDate = normalize(match[0]);
 
   if (!match[2] && date < startOfToday()) {
-    date = new Date(now.getFullYear() + 1, month, day);
+    year = now.getFullYear() + 1;
+    date = new Date(year, month, day);
+    displayDate = `${displayDate.replace(/\s+года$/, "")} ${year} года`;
   }
 
-  return { date, index: match.index };
+  return { date, index: match.index, displayDate };
 }
 
 function parseNextMonthDate(phrase) {
@@ -1254,7 +1373,11 @@ function parseNextMonthDate(phrase) {
   }
 
   const now = new Date();
-  return { date: new Date(now.getFullYear(), now.getMonth() + 1, 1), index: match.index };
+  return {
+    date: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+    index: match.index,
+    displayDate: normalize(match[0]),
+  };
 }
 
 function parseMonthPartDate(phrase) {
@@ -1273,13 +1396,15 @@ function parseMonthPartDate(phrase) {
   let year = getPhraseYearHint(phrase) || now.getFullYear();
   const day = getApproximateMonthDay(match[1], month, year);
   let date = new Date(year, month, day);
+  let displayDate = normalize(match[0]);
 
   if (!getPhraseYearHint(phrase) && date < startOfToday()) {
     year += 1;
     date = new Date(year, month, getApproximateMonthDay(match[1], month, year));
+    displayDate = `${displayDate} ${year} года`;
   }
 
-  return { date, index: match.index };
+  return { date, index: match.index, displayDate };
 }
 
 function getApproximateMonthDay(part, month, year) {
@@ -1444,10 +1569,14 @@ function parseExactDate(phrase, relative) {
     now.getFullYear();
 
   let date = new Date(year, month, day);
+  let displayDate = !match[2] ? normalize(match[0]) : "";
 
   if (!match[4] && !getRelativeYear(relative) && date < startOfToday()) {
     year += 1;
     date = new Date(year, month, day);
+    if (displayDate) {
+      displayDate = `${displayDate} ${year} года`;
+    }
   }
 
   if (!isValidMonthDay(day, month, year)) {
@@ -1455,7 +1584,7 @@ function parseExactDate(phrase, relative) {
     return null;
   }
 
-  return { date, index: match.index };
+  return { date, index: match.index, displayDate };
 }
 
 function parseSpokenExactDate(phrase, relative) {
@@ -1481,10 +1610,14 @@ function parseSpokenExactDate(phrase, relative) {
     now.getFullYear();
 
   let date = new Date(year, month, day);
+  let displayDate = !match[2] ? normalize(match[0]) : "";
 
   if (!match[4] && !getRelativeYear(relative) && date < startOfToday()) {
     year += 1;
     date = new Date(year, month, day);
+    if (displayDate) {
+      displayDate = `${displayDate} ${year} года`;
+    }
   }
 
   if (!isValidMonthDay(day, month, year)) {
@@ -1492,7 +1625,7 @@ function parseSpokenExactDate(phrase, relative) {
     return null;
   }
 
-  return { date, index: match.index };
+  return { date, index: match.index, displayDate };
 }
 
 function isValidMonthDay(day, month, year) {
@@ -1566,6 +1699,7 @@ function cleanName(name) {
       .replace(/\b(?:в|на)\s+час\s*(утра|вечера|дня|ночи)?/g, "")
       .replace(/\b(?:в|на)\s+\d{1,2}(?::\d{2}|\s*(?:часа?|часов)(?:\s*(?:и\s*)?\d{1,2}\s*(?:минут|минуты|минута))?)?\s*(утра|вечера|дня|ночи)?/g, "")
       .replace(/(?:в\s+)?(?:следующий|следующая|следующее|следующей)?\s*(понедельник|понедельника|вторник|вторника|среду|среда|среды|четверг|четверга|пятницу|пятница|пятницы|субботу|суббота|субботы|воскресенье|воскресенья)/g, "")
+      .replace(/\b(утром|утро|днем|днём|день|вечером|вечер|ночью|ночь)\b/g, "")
       .replace(/[.,!?]+/g, "")
       .replace(/\bна\s*$/g, "")
       .trim()
@@ -1630,9 +1764,9 @@ function renderList() {
     editButton.dataset.itemId = item.id;
 
     name.textContent = formatDisplayName(item.name);
-    visibleDate.textContent = formatDate(item.date, item.time);
+    visibleDate.textContent = formatItemDate(item);
     visibleDate.setAttribute("aria-hidden", "true");
-    screenReaderDate.textContent = formatDateLabel(item.date, item.time);
+    screenReaderDate.textContent = formatItemDateLabel(item);
     visibleDays.textContent = formatDaysLeftVisible(item.date);
     visibleDays.setAttribute("aria-hidden", "true");
     screenReaderDays.textContent = formatDaysLeftLabel(item.date);
@@ -2101,7 +2235,7 @@ function scheduleNotification(item, notificationTime) {
 
   const timerId = setTimeout(() => {
     new Notification("напоминание", {
-      body: `${formatDisplayName(item.name)}: ${formatDate(item.date, item.time)}`,
+      body: `${formatDisplayName(item.name)}: ${formatItemDate(item)}`,
     });
 
     if (isAlarmItem(item)) {
@@ -2134,10 +2268,28 @@ function formatDate(value, time) {
   return time ? `${dateText}, ${time}` : dateText;
 }
 
+function formatItemDate(item) {
+  if (item.displayDate) {
+    return item.period && !item.time ? `${item.displayDate} ${item.period}` : item.displayDate;
+  }
+
+  const dateText = formatDate(item.date, item.time);
+  return item.period && !item.time ? `${dateText} ${item.period}` : dateText;
+}
+
 function formatDateLabel(value, time) {
   const date = parseIsoDate(value);
   const dateText = `${date.getDate()} ${monthNames[date.getMonth()]} ${date.getFullYear()} года`;
   return time ? `${dateText}, ${time}` : dateText;
+}
+
+function formatItemDateLabel(item) {
+  if (item.displayDate) {
+    return item.period && !item.time ? `${item.displayDate} ${item.period}` : item.displayDate;
+  }
+
+  const dateText = formatDateLabel(item.date, item.time);
+  return item.period && !item.time ? `${dateText} ${item.period}` : dateText;
 }
 
 function formatDaysLeft(value) {
