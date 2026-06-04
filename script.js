@@ -16,6 +16,7 @@ let searchTitle = null;
 let searchCloseButton = null;
 let searchOkButton = null;
 let list = null;
+let topButton = null;
 
 const STORAGE_KEY = "expiry-reminders";
 const MESSAGE_VISIBLE_MS = 4000;
@@ -45,6 +46,20 @@ const monthNames = [
   "октября",
   "ноября",
   "декабря",
+];
+const monthPrepositionNames = [
+  "январе",
+  "феврале",
+  "марте",
+  "апреле",
+  "мае",
+  "июне",
+  "июле",
+  "августе",
+  "сентябре",
+  "октябре",
+  "ноябре",
+  "декабре",
 ];
 const monthMap = {
   январь: 0,
@@ -84,6 +99,7 @@ const monthMap = {
   декабре: 11,
   декабря: 11,
 };
+const monthWordPattern = Object.keys(monthMap).sort((a, b) => b.length - a.length).join("|");
 const hourWordMap = {
   один: 1,
   одна: 1,
@@ -209,6 +225,7 @@ const weekdayMap = {
   воскресенье: 0,
   воскресенья: 0,
 };
+const weekdayWordPattern = Object.keys(weekdayMap).sort((a, b) => b.length - a.length).join("|");
 
 let items = [];
 let recognition = null;
@@ -284,6 +301,10 @@ function initApp() {
       searchButton.addEventListener("click", startSearchListening);
     }
 
+    if (topButton) {
+      topButton.addEventListener("click", scrollToAppTop);
+    }
+
     if (searchCloseButton) {
       searchCloseButton.addEventListener("click", closeSearchDialog);
     }
@@ -337,6 +358,12 @@ function assignElements() {
   searchCloseButton = document.querySelector(".search-close-button");
   searchOkButton = document.querySelector(".search-ok-button");
   list = document.querySelector(".list");
+  topButton = document.querySelector(".top-button");
+}
+
+function scrollToAppTop() {
+  const target = document.querySelector(".app") || document.body;
+  target.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function handleStartClick(event) {
@@ -461,7 +488,7 @@ function handleSearchPhrase(value) {
     return false;
   }
 
-  const matches = findItemsByName(query);
+  const matches = findItemsBySearchQuery(query);
   cancelSearch();
 
   if (!matches.length) {
@@ -475,10 +502,319 @@ function handleSearchPhrase(value) {
   return true;
 }
 
+function findItemsBySearchQuery(query) {
+  const searchWeek = parseSearchWeek(query);
+
+  if (searchWeek) {
+    return findItemsByDateRange(searchWeek.startDate, searchWeek.endDate);
+  }
+
+  const searchYearPart = parseSearchYearPart(query);
+
+  if (searchYearPart) {
+    return findItemsByMonthRange(searchYearPart.year, searchYearPart.startMonth, searchYearPart.endMonth);
+  }
+
+  const searchMonth = parseSearchMonth(query);
+
+  if (searchMonth) {
+    if (searchMonth.startDate && searchMonth.endDate) {
+      return findItemsByDateRange(searchMonth.startDate, searchMonth.endDate);
+    }
+
+    return findItemsByMonth(searchMonth.year, searchMonth.month);
+  }
+
+  const searchYear = parseSearchYear(query);
+
+  if (searchYear) {
+    return findItemsByYear(searchYear);
+  }
+
+  const searchWeekday = parseSearchWeekday(query);
+
+  if (searchWeekday) {
+    return findItemsByDate(searchWeekday);
+  }
+
+  const searchDate = parseSearchDate(query);
+
+  if (searchDate) {
+    return findItemsByDate(searchDate);
+  }
+
+  return findItemsByName(query);
+}
+
 function findItemsByName(query) {
   return sortByDate(items).filter((item) => (
     isSearchMatch(normalizeSearchText(item.name), query)
   ));
+}
+
+function findItemsByDate(date) {
+  const isoDate = toIsoDate(date);
+
+  return sortByDate(items).filter((item) => item.date === isoDate);
+}
+
+function findItemsByDateRange(startDate, endDate) {
+  return sortByDate(items).filter((item) => {
+    const date = parseIsoDate(item.date);
+    return date >= startDate && date <= endDate;
+  });
+}
+
+function findItemsByYear(year) {
+  return sortByDate(items).filter((item) => (
+    parseIsoDate(item.date).getFullYear() === year
+  ));
+}
+
+function findItemsByMonth(year, month) {
+  return sortByDate(items).filter((item) => {
+    const date = parseIsoDate(item.date);
+    return date.getFullYear() === year && date.getMonth() === month;
+  });
+}
+
+function findItemsByMonthRange(year, startMonth, endMonth) {
+  return sortByDate(items).filter((item) => {
+    const date = parseIsoDate(item.date);
+    const month = date.getMonth();
+    return date.getFullYear() === year && month >= startMonth && month <= endMonth;
+  });
+}
+
+function parseSearchWeek(query) {
+  const phrase = normalizeSearchPhrase(query);
+  const relativeMatch = phrase.match(/^через\s+(неделю|(\d+|один|одна|одну|одно|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять)\s+недел(?:ю|и|ь)?)$/);
+
+  if (relativeMatch) {
+    const amount = relativeMatch[2]
+      ? getSearchAmount(relativeMatch[2])
+      : 1;
+
+    if (!amount) {
+      return null;
+    }
+
+    const startDate = getStartOfWeek(startOfToday());
+    startDate.setDate(startDate.getDate() + amount * 7);
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 6);
+    return { startDate, endDate };
+  }
+
+  if (!/^(на\s+)?(этой|следующей)\s+недел(?:е|ю)$/.test(phrase)) {
+    return null;
+  }
+
+  const match = phrase.match(/(этой|следующей)/);
+  const startDate = getStartOfWeek(startOfToday());
+
+  if (match[1] === "следующей") {
+    startDate.setDate(startDate.getDate() + 7);
+  }
+
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + 6);
+
+  return { startDate, endDate };
+}
+
+function getStartOfWeek(date) {
+  const result = new Date(date);
+  const day = result.getDay();
+  const daysFromMonday = day === 0 ? 6 : day - 1;
+  result.setDate(result.getDate() - daysFromMonday);
+  return result;
+}
+
+function parseSearchYearPart(query) {
+  const phrase = normalizeSearchPhrase(query);
+  const match = phrase.match(/^(?:в\s+)?(начале|середине|конце)\s+(следующего\s+)?года$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const year = new Date().getFullYear() + (match[2] ? 1 : 0);
+
+  if (match[1] === "начале") {
+    return { year, startMonth: 0, endMonth: 3 };
+  }
+
+  if (match[1] === "середине") {
+    return { year, startMonth: 4, endMonth: 7 };
+  }
+
+  return { year, startMonth: 8, endMonth: 11 };
+}
+
+function parseSearchMonth(query) {
+  const phrase = normalizeSearchPhrase(query);
+  const now = new Date();
+  const monthPart = parseSearchMonthPart(phrase, now.getFullYear(), now.getMonth());
+
+  if (monthPart) {
+    return monthPart;
+  }
+
+  const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const nextMonthPart = parseSearchNextMonthPart(
+    phrase,
+    nextMonthDate.getFullYear(),
+    nextMonthDate.getMonth(),
+  );
+
+  if (nextMonthPart) {
+    return nextMonthPart;
+  }
+
+  if (/^(в\s+)?этом\s+месяц(?:е)?$/.test(phrase)) {
+    return { year: now.getFullYear(), month: now.getMonth() };
+  }
+
+  if (/^(в\s+)?следующ(?:ем|ий)\s+месяц(?:е)?$/.test(phrase)) {
+    const date = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return { year: date.getFullYear(), month: date.getMonth() };
+  }
+
+  const namedMonth = parseSearchNamedMonth(phrase);
+
+  if (namedMonth) {
+    return namedMonth;
+  }
+
+  const relativeMatch = phrase.match(/^через\s+(месяц|(\d+|один|одна|одну|одно|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять)\s+месяц(?:а|ев)?)$/);
+
+  if (!relativeMatch) {
+    return null;
+  }
+
+  const amount = relativeMatch[2]
+    ? getSearchAmount(relativeMatch[2])
+    : 1;
+
+  if (!amount) {
+    return null;
+  }
+
+  const date = new Date(now.getFullYear(), now.getMonth() + amount, 1);
+  return { year: date.getFullYear(), month: date.getMonth() };
+}
+
+function parseSearchNamedMonth(phrase) {
+  const regex = new RegExp(`^(?:в\\s+)?(${monthWordPattern})(?:\\s+(следующего\\s+года|\\d{4}))?$`);
+  const match = regex.exec(phrase);
+
+  if (!match) {
+    return null;
+  }
+
+  const month = monthMap[match[1]];
+  const now = new Date();
+  let year = getExplicitYear(match[2]) || now.getFullYear();
+  const monthStart = new Date(year, month, 1);
+
+  if (!match[2] && monthStart < startOfToday()) {
+    year += 1;
+  }
+
+  return { year, month };
+}
+
+function parseSearchMonthPart(phrase, year, month) {
+  const match = phrase.match(/^(?:в\s+)?(начале|середине|конце)\s+месяц(?:а|е)?$/);
+
+  if (!match) {
+    return null;
+  }
+
+  if (match[1] === "начале") {
+    return getSearchMonthPartRange(year, month, 1, 10);
+  }
+
+  if (match[1] === "середине") {
+    return getSearchMonthPartRange(year, month, 11, 20);
+  }
+
+  return getSearchMonthPartRange(year, month, 21, lastDayOfMonth(month, year));
+}
+
+function parseSearchNextMonthPart(phrase, year, month) {
+  const match = phrase.match(/^(?:в\s+)?(начале|середине|конце)\s+следующ(?:его|ем)\s+месяц(?:а|е)?$/);
+
+  if (!match) {
+    return null;
+  }
+
+  if (match[1] === "начале") {
+    return getSearchMonthPartRange(year, month, 1, 10);
+  }
+
+  if (match[1] === "середине") {
+    return getSearchMonthPartRange(year, month, 11, 20);
+  }
+
+  return getSearchMonthPartRange(year, month, 21, lastDayOfMonth(month, year));
+}
+
+function getSearchMonthPartRange(year, month, startDay, endDay) {
+  return {
+    startDate: new Date(year, month, startDay),
+    endDate: new Date(year, month, endDay),
+  };
+}
+
+function getSearchAmount(value) {
+  return /^\d+$/.test(value) ? Number(value) : amountWordMap[value];
+}
+
+function parseSearchYear(query) {
+  const phrase = normalizeSearchPhrase(query);
+
+  if (/^(в\s+)?этом\s+году$/.test(phrase)) {
+    return new Date().getFullYear();
+  }
+
+  if (/^(в\s+)?следующ(?:ем|ий)\s+год(?:у)?$/.test(phrase)) {
+    return new Date().getFullYear() + 1;
+  }
+
+  const match = phrase.match(/^(\d{4})\s*(год(?:у|а)?)?$/);
+
+  return match ? Number(match[1]) : null;
+}
+
+function parseSearchWeekday(query) {
+  const phrase = normalizeSearchPhrase(query);
+  const regex = new RegExp(`^(?:в\\s+)?(?:следующ(?:ий|ая|ее|ей)\\s+)?(${weekdayWordPattern})$`);
+  const match = regex.exec(phrase);
+
+  if (!match) {
+    return null;
+  }
+
+  return getWeekdayDate(weekdayMap[match[1]], phrase.includes("следующ"));
+}
+
+function parseSearchDate(query) {
+  const phrase = normalizeSearchPhrase(query);
+
+  return (
+    parseNamedDate(phrase)?.date ||
+    parseExactDate(phrase, null)?.date ||
+    null
+  );
+}
+
+function normalizeSearchPhrase(query) {
+  return normalize(query)
+    .replace(/^(что|какие|какое|какая|есть|записи|напоминания)\s+/, "")
+    .replace(/^на\s+/, "")
+    .trim();
 }
 
 function isSearchMatch(name, query) {
@@ -777,7 +1113,7 @@ function handleEditPhrase(value) {
     playSavedSound();
     showStatus("изменено.");
     clearPhraseSoon();
-    return true;
+    return { type: "edit", item: renamedItem };
   }
 
   const correction = getCorrectedItem(item, value);
@@ -796,7 +1132,7 @@ function handleEditPhrase(value) {
   playSavedSound();
   showStatus(`изменено. ${formatReminderMessage(correction)}`);
   clearPhraseSoon();
-  return true;
+  return { type: "edit", item: correction };
 }
 
 function getRenamedItem(item, phrase) {
@@ -811,6 +1147,21 @@ function getRenamedItem(item, phrase) {
     name: getParsedName(match[1]),
     source: match[1],
   };
+}
+
+function getRecognizedPhraseText(phrase, result) {
+  if (!result || result.type !== "edit" || !result.item) {
+    return phrase;
+  }
+
+  const commandType = getCorrectionCommandType(phrase);
+
+  if (commandType !== "time") {
+    return phrase;
+  }
+
+  const timeText = getItemTimeText(result.item);
+  return timeText ? `изменить время ${timeText}` : phrase;
 }
 
 function getCorrectedItem(item, value) {
@@ -924,6 +1275,10 @@ function getCorrectionTarget(value) {
 }
 
 function getCorrectionDateTarget(value) {
+  if (monthMap[value] !== undefined) {
+    return `в ${monthPrepositionNames[monthMap[value]]}`;
+  }
+
   if (/^следующ(?:ий|его|ем)\s+год(?:а|у)?$/.test(value)) {
     return "в следующем году";
   }
@@ -945,6 +1300,11 @@ function isRelativeDateTarget(value) {
 
 function parseCorrectionTime(value) {
   const phrase = normalize(value);
+
+  if (isMidnightPhrase(phrase)) {
+    return "00:00";
+  }
+
   const prefixedTime = parseTime(`на ${phrase}`);
 
   if (prefixedTime && !/\d{1,2}\s+(январь|январе|января|феврале|февраль|февраля|март|марте|марта|апрель|апреле|апреля|май|мае|мая|июнь|июне|июня|июль|июле|июля|август|августе|августа|сентябрь|сентябре|сентября|октябрь|октябре|октября|ноябрь|ноябре|ноября|декабрь|декабре|декабря)/.test(phrase)) {
@@ -961,13 +1321,7 @@ function parseCorrectionTime(value) {
   const minute = Number(match[2] || match[3] || 0);
   const dayPart = match[4];
 
-  if (dayPart === "вечера" || dayPart === "дня") {
-    if (hour < 12) {
-      hour += 12;
-    }
-  } else if (!dayPart && hour >= 1 && hour <= 11) {
-    hour += 12;
-  }
+  hour = normalizeParsedHour(hour, dayPart);
 
   if (dayPart === "ночи" && hour === 12) {
     hour = 0;
@@ -978,6 +1332,12 @@ function parseCorrectionTime(value) {
   }
 
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function isMidnightPhrase(phrase) {
+  return /^(в\s+|на\s+)?полночь$/.test(phrase) ||
+    /^(в\s+|на\s+)?ноль(?:\s+ноль)?$/.test(phrase) ||
+    /^(в\s+|на\s+)?0(?::?00)?$/.test(phrase);
 }
 
 function updateItem(updatedItem) {
@@ -1366,7 +1726,7 @@ function getRelativeUnit(unit) {
 }
 
 function parseNamedDate(phrase) {
-  const match = phrase.match(/(?:^|\s)(?:до\s+)?(сегодня|завтра|послезавтра)/);
+  const match = phrase.match(/(?:^|\s)(?:до\s+)?(сегодня|завтра|послезавтра)(?=\s|$)/);
 
   if (!match) {
     return null;
@@ -1458,9 +1818,8 @@ function parseNextMonthDate(phrase) {
 }
 
 function parseMonthPartDate(phrase) {
-  const monthWords = Object.keys(monthMap).join("|");
   const regex = new RegExp(
-    `(?:^|\\s)в\\s+(?:(начале|середине|конце)\\s+)?(${monthWords})`,
+    `(?:^|\\s)в\\s+(?:(начале|середине|конце)\\s+)?(${monthWordPattern})`,
   );
   const match = regex.exec(phrase);
 
@@ -1528,6 +1887,10 @@ function getWeekdayDate(weekday, isNextWeek) {
 }
 
 function parseTime(phrase) {
+  if (/(?:^|\s)(?:в|на)?\s*полночь(?:\s|$)/.test(phrase)) {
+    return "00:00";
+  }
+
   const spokenTime = parseSpokenHourTime(phrase);
 
   if (spokenTime) {
@@ -1555,13 +1918,7 @@ function parseTime(phrase) {
   const minute = Number(match[2] || match[3] || 0);
   const dayPart = match[4];
 
-  if (dayPart === "вечера" || dayPart === "дня") {
-    if (hour < 12) {
-      hour += 12;
-    }
-  } else if (!dayPart && hour >= 1 && hour <= 11) {
-    hour += 12;
-  }
+  hour = normalizeParsedHour(hour, dayPart);
 
   if (dayPart === "ночи" && hour === 12) {
     hour = 0;
@@ -1588,19 +1945,25 @@ function parseSpokenHourTime(phrase) {
   let hour = hourWordMap[match[1]];
   const dayPart = match[2];
 
-  if (dayPart === "вечера" || dayPart === "дня") {
-    if (hour < 12) {
-      hour += 12;
-    }
-  } else if (!dayPart && hour >= 1 && hour <= 11) {
-    hour += 12;
-  }
+  hour = normalizeParsedHour(hour, dayPart);
 
   if (dayPart === "ночи" && hour === 12) {
     hour = 0;
   }
 
   return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function normalizeParsedHour(hour, dayPart) {
+  if (dayPart === "вечера" || dayPart === "дня") {
+    return hour < 12 ? hour + 12 : hour;
+  }
+
+  if (!dayPart && hour >= 1 && hour <= 7) {
+    return hour + 12;
+  }
+
+  return hour;
 }
 
 function parseExactDate(phrase, relative) {
@@ -1666,9 +2029,8 @@ function parseExactDate(phrase, relative) {
 
 function parseSpokenExactDate(phrase, relative) {
   const dayWords = Object.keys(dayWordMap).sort((a, b) => b.length - a.length).join("|");
-  const monthWords = Object.keys(monthMap).join("|");
   const regex = new RegExp(
-    `(?:^|\\s)(до\\s+)?(${dayWords})\\s+(${monthWords})(?:\\s+((?:\\d{4})|(?:следующего|следующий)\\s+года?))?`,
+    `(?:^|\\s)(до\\s+)?(${dayWords})\\s+(${monthWordPattern})(?:\\s+((?:\\d{4})|(?:следующего|следующий)\\s+года?))?`,
     "g",
   );
   const match = regex.exec(phrase);
@@ -1774,6 +2136,7 @@ function cleanName(name) {
       .replace(/\bв\s+(?:(начале|середине|конце)\s+)?(январь|январе|января|феврале|февраль|февраля|март|марте|марта|апрель|апреле|апреля|май|мае|мая|июнь|июне|июня|июль|июле|июля|август|августе|августа|сентябрь|сентябре|сентября|октябрь|октябре|октября|ноябрь|ноябре|ноября|декабрь|декабре|декабря)/g, "")
       .replace(/\b(?:в|на)\s+(один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|двадцать один|двадцать два|двадцать три)(?:\s+час(?:а|ов)?)?\s*(утра|вечера|дня|ночи)?/g, "")
       .replace(/\b(?:в|на)\s+час\s*(утра|вечера|дня|ночи)?/g, "")
+      .replace(/\b(?:в|на)?\s*полночь\b/g, "")
       .replace(/\b(?:в|на)\s+\d{1,2}(?::\d{2}|\s*(?:часа?|часов)(?:\s*(?:и\s*)?\d{1,2}\s*(?:минут|минуты|минута))?)?\s*(утра|вечера|дня|ночи)?/g, "")
       .replace(/(?:в\s+)?(?:следующий|следующая|следующее|следующей)?\s*(понедельник|понедельника|вторник|вторника|среду|среда|среды|четверг|четверга|пятницу|пятница|пятницы|субботу|суббота|субботы|воскресенье|воскресенья)/g, "")
       .replace(/\b(утром|утро|днем|днём|день|вечером|вечер|ночью|ночь)\b/g, "")
@@ -1926,8 +2289,9 @@ function setupSpeech() {
         : handlePhrase(phrase, { fromSpeech: true });
 
     if (result !== false && result !== "silent") {
-      showRecognizedPhrase(phrase);
-      announceToScreenReader(`распознано: ${phrase}`);
+      const displayedPhrase = getRecognizedPhraseText(phrase, result);
+      showRecognizedPhrase(displayedPhrase);
+      announceToScreenReader(`распознано: ${displayedPhrase}`);
     }
 
     if (!isSeriesActive && result !== false) {
@@ -2334,9 +2698,37 @@ function isAlarmItem(item) {
 }
 
 function sortByDate(listItems) {
-  return [...listItems].sort(
-    (a, b) => parseItemDateTime(a) - parseItemDateTime(b),
+  return [...listItems].sort(compareReminderOrder);
+}
+
+function compareReminderOrder(firstItem, secondItem) {
+  const dateDifference = parseItemDateTime(firstItem) - parseItemDateTime(secondItem);
+
+  if (dateDifference !== 0) {
+    return dateDifference;
+  }
+
+  const nameDifference = normalize(firstItem.name).localeCompare(
+    normalize(secondItem.name),
+    "ru",
   );
+
+  if (nameDifference !== 0) {
+    return nameDifference;
+  }
+
+  return getPeriodSortRank(firstItem.period) - getPeriodSortRank(secondItem.period);
+}
+
+function getPeriodSortRank(period) {
+  const ranks = {
+    утром: 1,
+    "днём": 2,
+    вечером: 3,
+    ночью: 4,
+  };
+
+  return ranks[period] || 0;
 }
 
 function formatDate(value, time) {

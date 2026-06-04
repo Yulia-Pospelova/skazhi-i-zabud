@@ -436,6 +436,7 @@ h1 {
 .search-close-button,
 .examples-close-button,
 .search-ok-button,
+.top-button,
 .search-result-close-button {
   min-block-size: 42px;
   padding: 0 12px;
@@ -454,6 +455,11 @@ h1 {
 }
 
 .search-ok-button {
+  inline-size: 100%;
+  margin-top: 12px;
+}
+
+.top-button {
   inline-size: 100%;
   margin-top: 12px;
 }
