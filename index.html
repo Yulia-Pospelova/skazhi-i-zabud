@@ -58,6 +58,7 @@
       </section>
 
       <section class="timeline">
+        <h2 class="timeline-title">список напоминаний</h2>
         <div class="timeline-head">
           <button class="search-button" type="button">
             поиск
@@ -99,6 +100,22 @@
         </div>
       </div>
 
+      <div class="edit-modal" hidden>
+        <div
+          class="edit-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="edit-dialog-title"
+        >
+          <h2 id="edit-dialog-title">изменение напоминания</h2>
+          <div class="edit-card"></div>
+          <p class="edit-hint">Скажи: изменить название, изменить дату, изменить время, добавить время или удалить время.</p>
+          <button class="edit-ok-button" type="button">
+            ок
+          </button>
+        </div>
+      </div>
+
       <div class="examples-modal" hidden>
         <div
           class="examples-dialog"
@@ -125,14 +142,14 @@
               <p>- паспорт до марта следующего года</p>
             </div>
             <div class="examples-note examples-note--plain">
-              <p>Одна запись: короткое нажатие.</p>
-              <p>Несколько записей: нажми и подержи <span class="button-name">старт</span>, потом отпусти.</p>
+              <p>Одно напоминание: короткое нажатие.</p>
+              <p>Несколько напоминаний: нажми и подержи <span class="button-name">старт</span>, потом отпусти.</p>
               <p>Говори с небольшими паузами.</p>
               <p>Чтобы закончить серию, скажи: “готово”.</p>
             </div>
             <div class="examples-note">
               <p class="examples-title">Изменение напоминания</p>
-              <p>Нажми <span class="button-name">изменить</span> и скажи: изменить название..., изменить дату..., изменить время... или удали.</p>
+              <p>Нажми <span class="button-name">изменить</span> и скажи: изменить название..., изменить дату..., изменить, добавить или удалить время.</p>
             </div>
             <div class="examples-note">
               <p class="examples-title">Поиск напоминания</p>

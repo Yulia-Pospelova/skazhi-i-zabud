@@ -69,6 +69,7 @@ h1 {
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
   transition: background-color 260ms ease;
 }
 
@@ -269,7 +270,14 @@ h1 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+}
+
+.timeline-title {
+  margin: 0 0 12px;
+  font-size: 22px;
+  line-height: 1.15;
+  text-align: center;
 }
 
 .timeline-head h2 {
@@ -331,11 +339,22 @@ h1 {
 
 .item-name {
   margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.field-label {
+  color: var(--color-text);
   font-weight: 700;
 }
 
 .item-date {
   margin: 0;
+  color: var(--color-muted);
+  font-size: 16px;
+}
+
+.item-time {
+  margin: 2px 0 0;
   color: var(--color-muted);
   font-size: 16px;
 }
@@ -390,6 +409,7 @@ h1 {
 }
 
 .search-modal,
+.edit-modal,
 .examples-modal {
   position: fixed;
   inset: 0;
@@ -402,11 +422,13 @@ h1 {
 }
 
 .search-modal[hidden],
+.edit-modal[hidden],
 .examples-modal[hidden] {
   display: none;
 }
 
 .search-dialog,
+.edit-dialog,
 .examples-dialog {
   inline-size: min(560px, 100%);
   max-block-size: min(82dvb, 720px);
@@ -428,14 +450,64 @@ h1 {
 }
 
 .search-dialog h2,
+.edit-dialog h2,
 .examples-dialog h2 {
   margin: 0;
   font-size: 22px;
 }
 
+.edit-modal {
+  z-index: 20;
+}
+
+.edit-dialog h2 {
+  margin-bottom: 12px;
+}
+
+.edit-card {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-soft);
+}
+
+.edit-card-name,
+.edit-card-date,
+.edit-card-time {
+  margin: 0;
+  font-size: 16px;
+}
+
+.edit-card-date,
+.edit-card-time {
+  color: var(--color-muted);
+}
+
+.edit-card-days {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  color: var(--color-text);
+  background: var(--color-control-strong);
+  font-size: 14px;
+  text-align: center;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.edit-hint {
+  margin: 10px 0 0;
+  color: var(--color-muted);
+  font-size: 16px;
+  line-height: 1.35;
+}
+
 .search-close-button,
 .examples-close-button,
 .search-ok-button,
+.edit-ok-button,
 .top-button,
 .search-result-close-button {
   min-block-size: 42px;
@@ -455,6 +527,11 @@ h1 {
 }
 
 .search-ok-button {
+  inline-size: 100%;
+  margin-top: 12px;
+}
+
+.edit-ok-button {
   inline-size: 100%;
   margin-top: 12px;
 }
@@ -480,11 +557,17 @@ h1 {
 
 .search-result-name {
   margin: 0 0 4px;
-  font-size: 20px;
+  font-size: 16px;
 }
 
 .search-result-date {
   margin: 0;
+  color: var(--color-muted);
+  font-size: 16px;
+}
+
+.search-result-time {
+  margin: 2px 0 0;
   color: var(--color-muted);
   font-size: 16px;
 }
