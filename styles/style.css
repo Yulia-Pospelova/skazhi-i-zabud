@@ -373,17 +373,38 @@ h1 {
 }
 
 .item-days {
+  position: relative;
   align-self: center;
   min-inline-size: 88px;
   margin-top: 6px;
   padding: 10px 12px;
+  border: 0;
   border-radius: var(--radius);
   color: var(--color-text);
   background: var(--color-control-strong);
+  font: inherit;
   font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   text-align: center;
   font-weight: 700;
   line-height: 1.2;
+  cursor: pointer;
+}
+
+.item-days::after,
+.edit-card-days::after,
+.search-result-days::after {
+  content: "";
+  inline-size: 14px;
+  block-size: 14px;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-block-start-width: 5px;
+  border-radius: 3px;
+  opacity: 0.75;
 }
 
 .item-actions {
@@ -423,6 +444,7 @@ h1 {
 
 .search-modal,
 .edit-modal,
+.calendar-modal,
 .examples-modal {
   position: fixed;
   inset: 0;
@@ -436,12 +458,14 @@ h1 {
 
 .search-modal[hidden],
 .edit-modal[hidden],
+.calendar-modal[hidden],
 .examples-modal[hidden] {
   display: none;
 }
 
 .search-dialog,
 .edit-dialog,
+.calendar-dialog,
 .examples-dialog {
   inline-size: min(560px, 100%);
   max-block-size: min(82dvb, 720px);
@@ -464,6 +488,7 @@ h1 {
 
 .search-dialog h2,
 .edit-dialog h2,
+.calendar-dialog h2,
 .examples-dialog h2 {
   margin: 0;
   font-size: 22px;
@@ -471,6 +496,94 @@ h1 {
 
 .edit-modal {
   z-index: 20;
+}
+
+.calendar-modal {
+  z-index: 30;
+}
+
+.calendar-head {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.calendar-dialog h2 {
+  text-align: center;
+}
+
+.calendar-prev-button,
+.calendar-next-button {
+  min-block-size: 44px;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--color-text);
+  background: var(--color-control-strong);
+  font: inherit;
+  font-size: 28px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.calendar-weekdays {
+  margin-bottom: 6px;
+  color: var(--color-muted);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  min-inline-size: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  background: var(--color-soft);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.calendar-day--empty {
+  border: 0;
+  background: transparent;
+}
+
+.calendar-day--weekend {
+  color: var(--color-danger-text);
+  background: var(--color-danger-soft);
+}
+
+.calendar-day--selected {
+  color: var(--color-surface);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.calendar-close-button {
+  inline-size: 100%;
+  min-block-size: 42px;
+  margin-top: 12px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--color-muted);
+  background: var(--color-control);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .edit-dialog h2 {
@@ -499,15 +612,23 @@ h1 {
 }
 
 .edit-card-days {
+  inline-size: 100%;
   margin: 10px 0 0;
   padding: 10px 12px;
+  border: 0;
   border-radius: var(--radius);
   color: var(--color-text);
   background: var(--color-control-strong);
+  font: inherit;
   font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   text-align: center;
   font-weight: 700;
   line-height: 1.2;
+  cursor: pointer;
 }
 
 .edit-hint {
@@ -590,15 +711,23 @@ h1 {
 }
 
 .search-result-days {
+  inline-size: 100%;
   margin: 12px 0 0;
   padding: 10px 12px;
+  border: 0;
   border-radius: var(--radius);
   color: var(--color-text);
   background: var(--color-control-strong);
+  font: inherit;
   font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   text-align: center;
   font-weight: 700;
   line-height: 1.2;
+  cursor: pointer;
 }
 
 .search-result-actions {

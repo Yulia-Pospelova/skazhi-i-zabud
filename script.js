@@ -19,6 +19,12 @@ let searchOkButton = null;
 let editModal = null;
 let editCard = null;
 let editOkButton = null;
+let calendarModal = null;
+let calendarTitle = null;
+let calendarGrid = null;
+let calendarPrevButton = null;
+let calendarNextButton = null;
+let calendarCloseButton = null;
 let list = null;
 let topButton = null;
 
@@ -265,6 +271,9 @@ let isSearchActive = false;
 let searchReturnFocus = null;
 let currentSearchItemIds = [];
 let currentSearchQuery = "";
+let calendarItemId = null;
+let calendarYear = null;
+let calendarMonth = null;
 let previousPageOverflow = "";
 let examplesReturnFocus = null;
 let notificationTimers = [];
@@ -361,6 +370,34 @@ function initApp() {
       });
     }
 
+    if (calendarPrevButton) {
+      calendarPrevButton.addEventListener("click", () => {
+        changeCalendarMonth(-1);
+      });
+    }
+
+    if (calendarNextButton) {
+      calendarNextButton.addEventListener("click", () => {
+        changeCalendarMonth(1);
+      });
+    }
+
+    if (calendarCloseButton) {
+      calendarCloseButton.addEventListener("click", closeCalendarDialog);
+    }
+
+    if (calendarGrid) {
+      calendarGrid.addEventListener("click", handleCalendarGridClick);
+    }
+
+    if (calendarModal) {
+      calendarModal.addEventListener("click", (event) => {
+        if (event.target === calendarModal) {
+          closeCalendarDialog();
+        }
+      });
+    }
+
     if (examplesCloseButton) {
       examplesCloseButton.addEventListener("click", closeExamplesDialog);
     }
@@ -401,6 +438,12 @@ function assignElements() {
   editModal = document.querySelector(".edit-modal");
   editCard = document.querySelector(".edit-card");
   editOkButton = document.querySelector(".edit-ok-button");
+  calendarModal = document.querySelector(".calendar-modal");
+  calendarTitle = document.querySelector("#calendar-dialog-title");
+  calendarGrid = document.querySelector(".calendar-grid");
+  calendarPrevButton = document.querySelector(".calendar-prev-button");
+  calendarNextButton = document.querySelector(".calendar-next-button");
+  calendarCloseButton = document.querySelector(".calendar-close-button");
   list = document.querySelector(".list");
   topButton = document.querySelector(".top-button");
 }
@@ -508,6 +551,11 @@ function closeExamplesDialog(options = {}) {
 }
 
 function handleDocumentKeydown(event) {
+  if (event.key === "Escape" && isCalendarDialogOpen()) {
+    closeCalendarDialog();
+    return;
+  }
+
   if (event.key === "Escape" && isEditDialogOpen()) {
     closeEditDialog();
     return;
@@ -530,6 +578,11 @@ function handleDocumentKeydown(event) {
 
   if (event.key === "Tab" && isEditDialogOpen()) {
     keepFocusInsideDialog(event, editModal);
+    return;
+  }
+
+  if (event.key === "Tab" && isCalendarDialogOpen()) {
+    keepFocusInsideDialog(event, calendarModal);
     return;
   }
 
@@ -955,7 +1008,7 @@ function createSearchResult(item) {
   const name = document.createElement("h3");
   const date = document.createElement("p");
   const time = document.createElement("p");
-  const days = document.createElement("p");
+  const days = document.createElement("button");
   const actions = document.createElement("div");
   const editButton = document.createElement("button");
   const deleteButton = document.createElement("button");
@@ -974,6 +1027,7 @@ function createSearchResult(item) {
   editButton.type = "button";
   deleteButton.type = "button";
   closeButton.type = "button";
+  days.type = "button";
   editButton.setAttribute("aria-label", `изменить напоминание ${formatDisplayName(item.name)}`);
   deleteButton.setAttribute("aria-label", `удалить напоминание ${formatDisplayName(item.name)}`);
   closeButton.setAttribute("aria-label", `убрать из окна напоминание ${formatDisplayName(item.name)}`);
@@ -998,6 +1052,9 @@ function createSearchResult(item) {
 
   closeButton.addEventListener("click", () => {
     removeSearchResult(item.id);
+  });
+  days.addEventListener("click", () => {
+    openCalendarDialog(item);
   });
 
   content.append(name, date, time, days);
@@ -1177,6 +1234,120 @@ function refreshAfterEditModalUpdate(updatedItem) {
   renderEditDialogItem(updatedItem);
   resetEditModalTimer();
   refreshSearchDialog();
+}
+
+function openCalendarDialog(item) {
+  if (!calendarModal || !calendarGrid || !calendarTitle || !calendarCloseButton) {
+    return;
+  }
+
+  const date = parseIsoDate(item.date);
+  calendarItemId = item.id;
+  calendarYear = date.getFullYear();
+  calendarMonth = date.getMonth();
+  calendarModal.hidden = false;
+  renderCalendar();
+  lockPageScroll();
+  calendarCloseButton.focus();
+}
+
+function closeCalendarDialog() {
+  if (!calendarModal) {
+    return;
+  }
+
+  calendarModal.hidden = true;
+  calendarItemId = null;
+
+  if (!isSearchDialogOpen() && !isEditDialogOpen()) {
+    unlockPageScroll();
+  }
+}
+
+function isCalendarDialogOpen() {
+  return Boolean(calendarModal && !calendarModal.hidden);
+}
+
+function changeCalendarMonth(offset) {
+  const date = new Date(calendarYear, calendarMonth + offset, 1);
+  calendarYear = date.getFullYear();
+  calendarMonth = date.getMonth();
+  renderCalendar();
+}
+
+function renderCalendar() {
+  if (!calendarGrid || !calendarTitle || calendarYear === null || calendarMonth === null) {
+    return;
+  }
+
+  const item = items.find((currentItem) => currentItem.id === calendarItemId);
+  const selectedDate = item ? parseIsoDate(item.date) : null;
+  const firstDay = new Date(calendarYear, calendarMonth, 1);
+  const daysInMonth = lastDayOfMonth(calendarMonth, calendarYear);
+  const leadingEmptyDays = (firstDay.getDay() + 6) % 7;
+
+  calendarTitle.textContent = `${monthDisplayNames[calendarMonth]} ${calendarYear}`;
+  calendarGrid.innerHTML = "";
+
+  for (let index = 0; index < leadingEmptyDays; index += 1) {
+    const empty = document.createElement("span");
+    empty.className = "calendar-day calendar-day--empty";
+    calendarGrid.append(empty);
+  }
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = new Date(calendarYear, calendarMonth, day);
+    const button = document.createElement("button");
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+    const isSelected = selectedDate && toIsoDate(date) === toIsoDate(selectedDate);
+
+    button.className = "calendar-day";
+    button.type = "button";
+    button.textContent = String(day);
+    button.dataset.date = toIsoDate(date);
+    button.setAttribute("aria-label", `${day} ${monthNames[calendarMonth]} ${calendarYear}`);
+
+    if (isWeekend) {
+      button.classList.add("calendar-day--weekend");
+    }
+
+    if (isSelected) {
+      button.classList.add("calendar-day--selected");
+      button.setAttribute("aria-current", "date");
+    }
+
+    calendarGrid.append(button);
+  }
+}
+
+function handleCalendarGridClick(event) {
+  const button = event.target.closest("[data-date]");
+
+  if (!button || !calendarGrid.contains(button)) {
+    return;
+  }
+
+  selectCalendarDate(button.dataset.date);
+}
+
+function selectCalendarDate(dateValue) {
+  const item = items.find((currentItem) => currentItem.id === calendarItemId);
+
+  if (!item) {
+    closeCalendarDialog();
+    return;
+  }
+
+  const updatedItem = {
+    ...item,
+    date: dateValue,
+    displayDate: "",
+  };
+
+  updateItem(updatedItem);
+  renderEditDialogItem(updatedItem);
+  refreshSearchDialog();
+  closeCalendarDialog();
 }
 
 function getRenamedItem(item, phrase) {
@@ -1498,18 +1669,22 @@ function renderEditDialogItem(item) {
   const name = document.createElement("p");
   const date = document.createElement("p");
   const time = document.createElement("p");
-  const days = document.createElement("p");
+  const days = document.createElement("button");
 
   name.className = "edit-card-name";
   date.className = "edit-card-date";
   time.className = "edit-card-time";
   days.className = "edit-card-days";
+  days.type = "button";
 
   appendLabeledText(name, "название", formatDisplayName(item.name));
   appendLabeledText(date, "дата", getItemDateText(item));
   appendLabeledText(time, "время", getItemTimeText(item));
   time.hidden = !getItemTimeText(item);
   days.textContent = formatDaysLeftVisible(item.date);
+  days.addEventListener("click", () => {
+    openCalendarDialog(item);
+  });
 
   editCard.append(name, date, time, days);
 }
@@ -2405,7 +2580,7 @@ function renderList() {
     const screenReaderName = document.createElement("span");
     const screenReaderDate = document.createElement("span");
     const screenReaderTime = document.createElement("span");
-    const days = document.createElement("div");
+    const days = document.createElement("button");
     const visibleDays = document.createElement("span");
     const screenReaderDays = document.createElement("span");
     const editButton = document.createElement("button");
@@ -2430,6 +2605,7 @@ function renderList() {
     screenReaderDeleteText.className = "visually-hidden";
     editButton.type = "button";
     deleteButton.type = "button";
+    days.type = "button";
     editButton.dataset.itemId = item.id;
 
     appendLabeledText(visibleName, "название", formatDisplayName(item.name));
@@ -2456,6 +2632,9 @@ function renderList() {
     });
     deleteButton.addEventListener("click", () => {
       deleteItem(item.id);
+    });
+    days.addEventListener("click", () => {
+      openCalendarDialog(item);
     });
 
     days.append(visibleDays, screenReaderDays);

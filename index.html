@@ -119,6 +119,38 @@
         </div>
       </div>
 
+      <div class="calendar-modal" hidden>
+        <div
+          class="calendar-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="calendar-dialog-title"
+        >
+          <div class="calendar-head">
+            <button class="calendar-prev-button" type="button" aria-label="предыдущий месяц">
+              ‹
+            </button>
+            <h2 id="calendar-dialog-title">календарь</h2>
+            <button class="calendar-next-button" type="button" aria-label="следующий месяц">
+              ›
+            </button>
+          </div>
+          <div class="calendar-weekdays" aria-hidden="true">
+            <span>пн</span>
+            <span>вт</span>
+            <span>ср</span>
+            <span>чт</span>
+            <span>пт</span>
+            <span>сб</span>
+            <span>вс</span>
+          </div>
+          <div class="calendar-grid"></div>
+          <button class="calendar-close-button" type="button">
+            закрыть
+          </button>
+        </div>
+      </div>
+
       <div class="examples-modal" hidden>
         <div
           class="examples-dialog"
