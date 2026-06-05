@@ -2403,6 +2403,12 @@ function normalizeParsedHour(hour, dayPart, options = {}) {
 }
 
 function parseExactDate(phrase, relative) {
+  const numericDate = parseNumericExactDate(phrase);
+
+  if (numericDate) {
+    return numericDate;
+  }
+
   const spokenDate = parseSpokenExactDate(phrase, relative);
 
   if (spokenDate) {
@@ -2461,6 +2467,40 @@ function parseExactDate(phrase, relative) {
   }
 
   return { date, index: match.index, displayDate };
+}
+
+function parseNumericExactDate(phrase) {
+  const match = phrase.match(/(?:^|\s)(?:до\s+)?(\d{1,2})[./-](\d{1,2})(?:[./-](\d{2}|\d{4}))?(?=\s|$)/);
+
+  if (!match) {
+    return null;
+  }
+
+  const day = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const now = new Date();
+  let year = match[3]
+    ? normalizeNumericYear(match[3])
+    : now.getFullYear();
+
+  let date = new Date(year, month, day);
+
+  if (!match[3] && date < startOfToday()) {
+    year += 1;
+    date = new Date(year, month, day);
+  }
+
+  if (month < 0 || month > 11 || !isValidMonthDay(day, month, year)) {
+    setInvalidDateError(day, Math.max(0, Math.min(month, 11)));
+    return null;
+  }
+
+  return { date, index: match.index, displayDate: "" };
+}
+
+function normalizeNumericYear(value) {
+  const year = Number(value);
+  return value.length === 2 ? 2000 + year : year;
 }
 
 function parseSpokenExactDate(phrase, relative) {
@@ -2564,6 +2604,7 @@ function cleanName(name) {
     name
       .replace(/\bсрок\b/g, "")
       .replace(/\bпредмет\b/g, "")
+      .replace(/\b(?:до\s+)?\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?\b/g, "")
       .replace(/\b(?:до|на)\s+(сегодня|завтра|послезавтра)\b/g, "")
       .replace(/через\s+(полгода|пол\s+года|полгоду)/g, "")
       .replace(/через\s+(минуту|час|день|неделю|месяц|год|(\d+)\s*(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет))/g, "")

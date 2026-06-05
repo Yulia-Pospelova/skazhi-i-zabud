@@ -199,12 +199,22 @@ h1 {
 
 .manual-form {
   display: block;
+  inline-size: 100%;
   margin-top: 8px;
 }
 
+.manual-hint {
+  margin: 0 0 6px;
+  color: var(--color-muted);
+  font-size: 16px;
+  line-height: 1.25;
+}
+
 .manual-input {
+  display: block;
   inline-size: 100%;
   min-inline-size: 0;
+  box-sizing: border-box;
   min-block-size: 48px;
   padding: 12px 14px;
   border: 2px solid var(--color-border-strong);
@@ -213,6 +223,9 @@ h1 {
   background: var(--color-surface);
   font: inherit;
   font-size: 17px;
+  -webkit-tap-highlight-color: transparent;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .manual-input::placeholder {
