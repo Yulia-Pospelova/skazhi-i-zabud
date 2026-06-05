@@ -2,6 +2,7 @@ let startButton = null;
 let phraseInput = null;
 let statusText = null;
 let srStatus = null;
+let seriesOkButton = null;
 let notifyButton = null;
 let notifyStatus = null;
 let examplesButton = null;
@@ -29,8 +30,9 @@ const LONG_PRESS_DELAY_MS = 800;
 const ERROR_SPEAK_COOLDOWN_MS = 2500;
 const ERROR_REPEAT_MESSAGE_COOLDOWN_MS = 4500;
 const SPECIFIC_ERROR_COOLDOWN_MS = 5000;
+const SERIES_SILENCE_TIMEOUT_MS = 10000;
+const MODAL_IDLE_TIMEOUT_MS = 10000;
 const MAX_LOCAL_TIMER_MS = 2147483647;
-const stopPhrases = ["готово"];
 const reminderRules = [
   { days: 30, label: "за месяц" },
   { days: 7, label: "за неделю" },
@@ -251,6 +253,8 @@ let srStatusTimer = null;
 let notifyStatusTimer = null;
 let phraseTimer = null;
 let restartTimer = null;
+let seriesSilenceTimer = null;
+let editModalTimer = null;
 let startClickTimer = null;
 let longPressTimer = null;
 let isLongPress = false;
@@ -317,6 +321,10 @@ function initApp() {
       });
     }
 
+    if (seriesOkButton) {
+      seriesOkButton.addEventListener("click", finishSeriesByButton);
+    }
+
     if (searchButton) {
       searchButton.addEventListener("click", startSearchListening);
     }
@@ -376,6 +384,7 @@ function assignElements() {
   phraseInput = document.querySelector(".phrase-input");
   statusText = document.querySelector(".status");
   srStatus = document.querySelector(".sr-status");
+  seriesOkButton = document.querySelector(".series-ok-button");
   notifyButton = document.querySelector(".notify-button");
   notifyStatus = document.querySelector(".notify-status");
   examplesButton = document.querySelector(".examples-button");
@@ -1005,7 +1014,9 @@ function closeSearchDialog(options = {}) {
   }
 
   searchModal.hidden = true;
-  unlockPageScroll();
+  if (!isEditDialogOpen()) {
+    unlockPageScroll();
+  }
 
   if (searchResults) {
     searchResults.innerHTML = "";
@@ -1088,13 +1099,6 @@ function getDialogFocusableElements(dialogRoot) {
 }
 
 function handlePhrase(value, options = {}) {
-  if (isStopPhrase(value)) {
-    clearPhraseInput();
-    stopSeriesListening();
-    hideStatus();
-    return "stopped";
-  }
-
   const parsed = parsePhrase(value);
 
   if (!parsed || parsed.name === "предмет") {
@@ -1133,16 +1137,6 @@ function handlePhrase(value, options = {}) {
 }
 
 function handleEditPhrase(value) {
-  if (isStopPhrase(value)) {
-    if (isEditDialogOpen()) {
-      closeEditDialog();
-    } else {
-      finishEditing();
-    }
-    hideStatus();
-    return "stopped";
-  }
-
   const item = items.find((currentItem) => currentItem.id === editingItemId);
 
   if (!item) {
@@ -1181,6 +1175,7 @@ function handleEditPhrase(value) {
 
 function refreshAfterEditModalUpdate(updatedItem) {
   renderEditDialogItem(updatedItem);
+  resetEditModalTimer();
   refreshSearchDialog();
 }
 
@@ -1464,6 +1459,7 @@ function closeEditDialog() {
   }
 
   editModal.hidden = true;
+  clearTimeout(editModalTimer);
   editingItemId = null;
   stopSeriesListening();
   items = sortByDate(items);
@@ -1478,6 +1474,18 @@ function closeEditDialog() {
 
 function isEditDialogOpen() {
   return Boolean(editModal && !editModal.hidden);
+}
+
+function resetEditModalTimer() {
+  clearTimeout(editModalTimer);
+
+  if (!isEditDialogOpen()) {
+    return;
+  }
+
+  editModalTimer = setTimeout(() => {
+    closeEditDialog();
+  }, MODAL_IDLE_TIMEOUT_MS);
 }
 
 function renderEditDialogItem(item) {
@@ -1516,6 +1524,7 @@ function cancelEditing() {
   if (editModal) {
     editModal.hidden = true;
   }
+  clearTimeout(editModalTimer);
   if (wasEditDialogOpen && !isSearchDialogOpen()) {
     unlockPageScroll();
   }
@@ -1575,16 +1584,6 @@ function hasDuplicateItem(newItem) {
   ));
 }
 
-function isStopPhrase(value) {
-  const phrase = normalize(value).replace(/[.,!?]+/g, "");
-
-  return stopPhrases.some((stopPhrase) => (
-    phrase === stopPhrase ||
-    phrase.startsWith(`${stopPhrase} `) ||
-    phrase.endsWith(` ${stopPhrase}`)
-  ));
-}
-
 function startSeriesListening() {
   if (!recognition) {
     showStatus("скажи или напиши одной фразой: страховка до 15 июля");
@@ -1596,6 +1595,7 @@ function startSeriesListening() {
   isSeriesActive = true;
   setRecognitionContinuous(false);
   startButton.classList.add("is-listening");
+  showSeriesOkButton();
   showStatus("Слушаю, можно сказать несколько фраз");
   lastErrorPhrase = "";
   restartRecognition();
@@ -1604,13 +1604,45 @@ function startSeriesListening() {
 function stopSeriesListening() {
   isSeriesActive = false;
   clearTimeout(restartTimer);
+  clearTimeout(seriesSilenceTimer);
   startButton.classList.remove("is-listening");
+  hideSeriesOkButton();
   setRecognitionContinuous(false);
 
   try {
     recognition.stop();
   } catch (error) {
     // Recognition may already be stopped by the browser.
+  }
+}
+
+function finishSeriesByButton() {
+  stopSeriesListening();
+  hideStatus();
+  clearPhraseInput();
+}
+
+function resetSeriesSilenceTimer() {
+  clearTimeout(seriesSilenceTimer);
+
+  if (!isSeriesActive) {
+    return;
+  }
+
+  seriesSilenceTimer = setTimeout(() => {
+    finishSeriesByButton();
+  }, SERIES_SILENCE_TIMEOUT_MS);
+}
+
+function showSeriesOkButton() {
+  if (seriesOkButton) {
+    seriesOkButton.hidden = false;
+  }
+}
+
+function hideSeriesOkButton() {
+  if (seriesOkButton) {
+    seriesOkButton.hidden = true;
   }
 }
 
@@ -2310,6 +2342,7 @@ function cleanName(name) {
     name
       .replace(/\bсрок\b/g, "")
       .replace(/\bпредмет\b/g, "")
+      .replace(/\b(?:до|на)\s+(сегодня|завтра|послезавтра)\b/g, "")
       .replace(/через\s+(полгода|пол\s+года|полгоду)/g, "")
       .replace(/через\s+(минуту|час|день|неделю|месяц|год|(\d+)\s*(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет))/g, "")
       .replace(/\bв\s+следующ(?:ем|ий)\s+год(?:у)?/g, "")
@@ -2323,6 +2356,7 @@ function cleanName(name) {
       .replace(/(?:в\s+)?(?:следующий|следующая|следующее|следующей)?\s*(понедельник|понедельника|вторник|вторника|среду|среда|среды|четверг|четверга|пятницу|пятница|пятницы|субботу|суббота|субботы|воскресенье|воскресенья)/g, "")
       .replace(/\b(утром|утро|днем|днём|день|вечером|вечер|ночью|ночь)\b/g, "")
       .replace(/[.,!?]+/g, "")
+      .replace(/\s+/g, " ")
       .replace(/\bна\s*$/g, "")
       .trim()
       || "предмет"
@@ -2463,6 +2497,18 @@ function deleteItem(id) {
   showStatus("удалено", SHORT_MESSAGE_VISIBLE_MS);
 }
 
+function getFinalPhraseFromResult(event) {
+  let phrase = "";
+
+  for (let index = event.resultIndex; index < event.results.length; index += 1) {
+    if (event.results[index].isFinal) {
+      phrase += ` ${event.results[index][0].transcript}`;
+    }
+  }
+
+  return phrase.trim();
+}
+
 function setupSpeech() {
   const SpeechRecognition =
     window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -2481,17 +2527,9 @@ function setupSpeech() {
   recognition.maxAlternatives = 1;
 
   recognition.addEventListener("result", (event) => {
-    const phrase = event.results[0][0].transcript;
+    const phrase = getFinalPhraseFromResult(event);
 
-    if (isStopPhrase(phrase)) {
-      if (isSearchActive) {
-        cancelSearch();
-        hideStatus();
-      } else if (editingItemId) {
-        handleEditPhrase(phrase);
-      } else {
-        handlePhrase(phrase, { fromSpeech: true });
-      }
+    if (!phrase) {
       return;
     }
 
@@ -2509,6 +2547,8 @@ function setupSpeech() {
 
     if (!isSeriesActive && !isEditDialogOpen() && result !== false) {
       stopSeriesListening();
+    } else if (isSeriesActive && result !== false) {
+      resetSeriesSilenceTimer();
     }
   });
 
