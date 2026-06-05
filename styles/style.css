@@ -197,6 +197,33 @@ h1 {
   outline-offset: 2px;
 }
 
+.manual-form {
+  display: block;
+  margin-top: 8px;
+}
+
+.manual-input {
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 48px;
+  padding: 12px 14px;
+  border: 2px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+  font-size: 17px;
+}
+
+.manual-input::placeholder {
+  color: var(--color-muted);
+}
+
+.manual-input:focus-visible {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
 .clear-button,
 .search-button,
 .notify-button,
@@ -401,10 +428,10 @@ h1 {
   inline-size: 14px;
   block-size: 14px;
   flex: 0 0 auto;
-  border: 2px solid currentColor;
+  border: 2px solid var(--color-primary);
   border-block-start-width: 5px;
   border-radius: 3px;
-  opacity: 0.75;
+  background: var(--color-surface);
 }
 
 .item-actions {

@@ -1,5 +1,7 @@
 let startButton = null;
 let phraseInput = null;
+let manualForm = null;
+let manualInput = null;
 let statusText = null;
 let srStatus = null;
 let seriesOkButton = null;
@@ -334,6 +336,10 @@ function initApp() {
       seriesOkButton.addEventListener("click", finishSeriesByButton);
     }
 
+    if (manualForm) {
+      manualForm.addEventListener("submit", handleManualSubmit);
+    }
+
     if (searchButton) {
       searchButton.addEventListener("click", startSearchListening);
     }
@@ -419,6 +425,8 @@ function initApp() {
 function assignElements() {
   startButton = document.querySelector(".start-button");
   phraseInput = document.querySelector(".phrase-input");
+  manualForm = document.querySelector(".manual-form");
+  manualInput = document.querySelector(".manual-input");
   statusText = document.querySelector(".status");
   srStatus = document.querySelector(".sr-status");
   seriesOkButton = document.querySelector(".series-ok-button");
@@ -1155,8 +1163,31 @@ function getDialogFocusableElements(dialogRoot) {
   return Array.from(dialogRoot.querySelectorAll("button, [href], input, textarea, select, [tabindex]:not([tabindex='-1'])"));
 }
 
+function handleManualSubmit(event) {
+  event.preventDefault();
+
+  const value = normalizeManualInput(manualInput.value);
+
+  if (!value) {
+    return;
+  }
+
+  const result = handlePhrase(value, { preferWrittenTime: true });
+
+  if (result !== false) {
+    manualInput.value = "";
+  }
+}
+
+function normalizeManualInput(value) {
+  return value
+    .replace(/[\\/]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function handlePhrase(value, options = {}) {
-  const parsed = parsePhrase(value);
+  const parsed = parsePhrase(value, options);
 
   if (!parsed || parsed.name === "предмет") {
     if (options.fromSpeech) {
@@ -1551,7 +1582,7 @@ function parseCorrectionTime(value) {
     return prefixedTime;
   }
 
-  const match = phrase.match(/(?:^|\s)(\d{1,2})(?::(\d{2})|\s*(?:часа?|часов)(?:\s*(?:и\s*)?(\d{1,2})\s*(?:минут|минуты|минута))?)?\s*(утра|вечера|дня|ночи)?$/);
+  const match = phrase.match(/(?:^|\s)(\d{1,2})(?:(?::|\.)(\d{2})|\s*(?:часа?|часов)(?:\s*(?:и\s*)?(\d{1,2})\s*(?:минут|минуты|минута))?)?\s*(утра|вечера|дня|ночи)?$/);
 
   if (!match) {
     return null;
@@ -1863,7 +1894,7 @@ function restartRecognition() {
   restartTimer = setTimeout(startRecognition, 80);
 }
 
-function parsePhrase(value) {
+function parsePhrase(value, options = {}) {
   lastParseError = "";
   const phrase = normalize(value);
 
@@ -1871,7 +1902,7 @@ function parsePhrase(value) {
     return null;
   }
 
-  const time = parseTime(phrase);
+  const time = parseTime(phrase, options);
   const period = time ? "" : parseDayPeriod(phrase);
   const relative = parseRelativeDate(phrase);
   const yearOnly = parseYearOnlyDate(phrase);
@@ -2275,7 +2306,7 @@ function getWeekdayDate(weekday, isNextWeek) {
   return date;
 }
 
-function parseTime(phrase) {
+function parseTime(phrase, options = {}) {
   if (/(?:^|\s)(?:в|на)?\s*полночь(?:\s|$)/.test(phrase)) {
     return "00:00";
   }
@@ -2296,8 +2327,20 @@ function parseTime(phrase) {
   }
 
   const match = phrase.match(
-    /(?:^|\s)(?:в|на)\s+(\d{1,2})(?::(\d{2})|\s*(?:часа?|часов)(?:\s*(?:и\s*)?(\d{1,2})\s*(?:минут|минуты|минута))?)?\s*(утра|вечера|дня|ночи)?/,
+    /(?:^|\s)(?:(?:в|на)\s+)?(\d{1,2})(?:(?::|\.)(\d{2})|\s*(?:часа?|часов)(?:\s*(?:и\s*)?(\d{1,2})\s*(?:минут|минуты|минута))?)\s*(утра|вечера|дня|ночи)?/,
   );
+
+  if (!match && options.preferWrittenTime) {
+    const writtenMatch = phrase.match(/(?:^|\s)(?:(?:в|на)\s+)?(\d{1,2})\s*(утра|вечера|дня|ночи)?$/);
+
+    if (writtenMatch) {
+      const hour = normalizeParsedHour(Number(writtenMatch[1]), writtenMatch[2], options);
+
+      if (hour <= 23) {
+        return `${String(hour).padStart(2, "0")}:00`;
+      }
+    }
+  }
 
   if (!match) {
     return null;
@@ -2307,7 +2350,7 @@ function parseTime(phrase) {
   const minute = Number(match[2] || match[3] || 0);
   const dayPart = match[4];
 
-  hour = normalizeParsedHour(hour, dayPart);
+  hour = normalizeParsedHour(hour, dayPart, options);
 
   if (dayPart === "ночи" && hour === 12) {
     hour = 0;
@@ -2343,9 +2386,13 @@ function parseSpokenHourTime(phrase) {
   return `${String(hour).padStart(2, "0")}:00`;
 }
 
-function normalizeParsedHour(hour, dayPart) {
+function normalizeParsedHour(hour, dayPart, options = {}) {
   if (dayPart === "вечера" || dayPart === "дня") {
     return hour < 12 ? hour + 12 : hour;
+  }
+
+  if (options.preferWrittenTime) {
+    return hour;
   }
 
   if (!dayPart && hour >= 1 && hour <= 7) {
@@ -2527,7 +2574,7 @@ function cleanName(name) {
       .replace(/\b(?:в|на)\s+(один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|двадцать один|двадцать два|двадцать три)(?:\s+час(?:а|ов)?)?\s*(утра|вечера|дня|ночи)?/g, "")
       .replace(/\b(?:в|на)\s+час\s*(утра|вечера|дня|ночи)?/g, "")
       .replace(/\b(?:в|на)?\s*полночь\b/g, "")
-      .replace(/\b(?:в|на)\s+\d{1,2}(?::\d{2}|\s*(?:часа?|часов)(?:\s*(?:и\s*)?\d{1,2}\s*(?:минут|минуты|минута))?)?\s*(утра|вечера|дня|ночи)?/g, "")
+      .replace(/\b(?:(?:в|на)\s+)?\d{1,2}(?:(?::|\.)\d{2}|\s*(?:часа?|часов)(?:\s*(?:и\s*)?\d{1,2}\s*(?:минут|минуты|минута))?)\s*(утра|вечера|дня|ночи)?/g, "")
       .replace(/(?:в\s+)?(?:следующий|следующая|следующее|следующей)?\s*(понедельник|понедельника|вторник|вторника|среду|среда|среды|четверг|четверга|пятницу|пятница|пятницы|субботу|суббота|субботы|воскресенье|воскресенья)/g, "")
       .replace(/\b(утром|утро|днем|днём|день|вечером|вечер|ночью|ночь)\b/g, "")
       .replace(/[.,!?]+/g, "")
