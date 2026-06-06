@@ -303,6 +303,7 @@ function initApp() {
     }
     setupSpeech();
     scheduleAllNotifications();
+    registerServiceWorker();
 
     if (startButton) {
       startButton.addEventListener("click", handleStartClick);
@@ -3700,4 +3701,16 @@ function migrateStoredItem(item) {
 
 function saveItems() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) {
+    return;
+  }
+
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./service-worker.js").catch((error) => {
+      console.warn("Service worker registration failed", error);
+    });
+  });
 }

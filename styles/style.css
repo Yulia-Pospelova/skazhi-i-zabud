@@ -278,18 +278,6 @@ h1 {
   font-weight: 700;
 }
 
-.sr-status {
-  position: absolute;
-  inline-size: 1px;
-  block-size: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
 .notify-button,
 .examples-button {
   inline-size: auto;
@@ -339,16 +327,7 @@ h1 {
   line-height: 1.1;
 }
 
-.clear-button {
-  inline-size: 100%;
-  min-block-size: 38px;
-  padding: 7px 10px;
-  color: var(--color-muted);
-  background: var(--color-control);
-  font-size: 15px;
-  font-weight: 700;
-}
-
+.clear-button,
 .search-button {
   inline-size: 100%;
   min-block-size: 38px;

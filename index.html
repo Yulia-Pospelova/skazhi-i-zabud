@@ -4,7 +4,13 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#167348" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="скажи и забудь" />
     <title>скажи и забудь</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="stylesheet" href="./fonts/fonts.css" />
     <link rel="stylesheet" href="./styles/variables.css" />
     <link rel="stylesheet" href="./styles/globals.css" />
@@ -36,6 +42,7 @@
         <button
           class="start-button"
           type="button"
+          aria-label="начать голосовую запись"
         >
           <span class="start-icon" aria-hidden="true">●</span>
           <span class="start-text">старт</span>
@@ -68,7 +75,7 @@
           ок
         </button>
         <p class="status" aria-live="polite"></p>
-        <p class="sr-status" aria-live="polite"></p>
+        <p class="sr-status visually-hidden" aria-live="polite"></p>
       </section>
 
       <section class="timeline">

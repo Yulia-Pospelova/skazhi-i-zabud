@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="скажи и забудь">
+  <rect width="512" height="512" rx="96" fill="#167348"/>
+  <circle cx="256" cy="206" r="94" fill="#ffffff"/>
+  <circle cx="256" cy="206" r="20" fill="#167348"/>
+  <path d="M156 334c28 42 64 63 100 63s72-21 100-63" fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round"/>
+  <path d="M256 300v88" fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round"/>
+</svg>
