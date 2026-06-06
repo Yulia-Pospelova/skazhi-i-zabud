@@ -539,7 +539,13 @@ function openExamplesDialog() {
   examplesModal.hidden = false;
   examplesButton.setAttribute("aria-expanded", "true");
   lockPageScroll();
-  examplesCloseButton.focus();
+  const examplesTitle = document.querySelector("#examples-dialog-title");
+
+  if (examplesTitle) {
+    examplesTitle.focus();
+  } else {
+    examplesCloseButton.focus();
+  }
 }
 
 function closeExamplesDialog(options = {}) {
