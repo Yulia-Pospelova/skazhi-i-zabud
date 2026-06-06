@@ -1,4 +1,4 @@
-const CACHE_NAME = "skazhi-i-zabud-v2";
+const CACHE_NAME = "skazhi-i-zabud-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -47,9 +47,8 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    caches.match(request).then((cachedResponse) => (
-      cachedResponse ||
-      fetch(request).then((networkResponse) => {
+    fetch(request)
+      .then((networkResponse) => {
         const responseClone = networkResponse.clone();
 
         caches.open(CACHE_NAME).then((cache) => {
@@ -57,8 +56,10 @@ self.addEventListener("fetch", (event) => {
         });
 
         return networkResponse;
-      }).catch(() => caches.match("./index.html"))
-    )),
+      })
+      .catch(() => caches.match(request).then((cachedResponse) => (
+        cachedResponse || caches.match("./index.html")
+      ))),
   );
 });
 
