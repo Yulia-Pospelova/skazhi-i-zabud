@@ -2909,17 +2909,33 @@ function getRecognitionErrorMessage() {
 }
 
 async function requestNotificationPermission() {
+  if (!window.isSecureContext) {
+    showNotifyStatus("уведомления работают только по защищенной ссылке https");
+    return;
+  }
+
   if (!("Notification" in window)) {
     showNotifyStatus("этот браузер не поддерживает уведомления");
     return;
   }
 
-  const permission = await Notification.requestPermission();
-  showNotifyStatus(
-    permission === "granted"
-      ? "уведомления включены"
-      : "уведомления не включены",
-  );
+  try {
+    const permission = await Notification.requestPermission();
+
+    if (permission === "granted") {
+      showNotifyStatus("уведомления включены");
+      scheduleAllNotifications();
+      return;
+    }
+
+    showNotifyStatus(
+      permission === "denied"
+        ? "уведомления запрещены в настройках браузера"
+        : "уведомления не включены",
+    );
+  } catch (error) {
+    showNotifyStatus("не получилось включить уведомления");
+  }
 }
 
 function showStatus(message, visibleMs = MESSAGE_VISIBLE_MS) {
@@ -3234,9 +3250,7 @@ function scheduleNotification(item, notificationTime) {
   }
 
   const timerId = setTimeout(() => {
-    new Notification("напоминание", {
-      body: `${formatDisplayName(item.name)}: ${formatItemDate(item)}`,
-    });
+    showReminderNotification(item);
 
     if (isAlarmItem(item)) {
       playAlarmSound();
@@ -3250,6 +3264,30 @@ function scheduleNotification(item, notificationTime) {
   }, delay);
 
   notificationTimers.push(timerId);
+}
+
+async function showReminderNotification(item) {
+  const title = "напоминание";
+  const options = {
+    body: `${formatDisplayName(item.name)}: ${formatItemDate(item)}`,
+    icon: "./icons/icon-192.png",
+    badge: "./icons/icon-192.png",
+  };
+
+  try {
+    if ("serviceWorker" in navigator) {
+      const registration = await navigator.serviceWorker.ready;
+
+      if (registration && registration.showNotification) {
+        registration.showNotification(title, options);
+        return;
+      }
+    }
+
+    new Notification(title, options);
+  } catch (error) {
+    // Some mobile browsers reject notifications even after permission.
+  }
 }
 
 function isAlarmItem(item) {

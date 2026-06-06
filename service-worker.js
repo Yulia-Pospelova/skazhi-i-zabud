@@ -1,4 +1,4 @@
-const CACHE_NAME = "skazhi-i-zabud-v1";
+const CACHE_NAME = "skazhi-i-zabud-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -59,5 +59,25 @@ self.addEventListener("fetch", (event) => {
         return networkResponse;
       }).catch(() => caches.match("./index.html"))
     )),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      const currentClient = clients.find((client) => "focus" in client);
+
+      if (currentClient) {
+        return currentClient.focus();
+      }
+
+      if (self.clients.openWindow) {
+        return self.clients.openWindow("./");
+      }
+
+      return null;
+    }),
   );
 });
