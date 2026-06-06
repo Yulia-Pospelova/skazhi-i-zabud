@@ -498,7 +498,7 @@ function clearStartPress() {
 
 function startSingleListening() {
   if (!recognition) {
-    showStatus("скажи или напиши одной фразой: страховка до 15 июля");
+    showVoiceUnavailableFallback();
     return;
   }
 
@@ -516,7 +516,7 @@ function startSearchListening() {
   unlockAudio();
 
   if (!recognition) {
-    showStatus("голос может быть недоступен в этом браузере");
+    showVoiceUnavailableFallback("голосовой поиск недоступен, напиши напоминание вручную");
     return;
   }
 
@@ -1790,7 +1790,7 @@ function cancelSearch() {
 
 function startEditingItem(id) {
   if (!recognition) {
-    showStatus("голос может быть недоступен в этом браузере");
+    showVoiceUnavailableFallback("голосовое изменение недоступно в этом браузере");
     return;
   }
 
@@ -1831,7 +1831,7 @@ function hasDuplicateItem(newItem) {
 
 function startSeriesListening() {
   if (!recognition) {
-    showStatus("скажи или напиши одной фразой: страховка до 15 июля");
+    showVoiceUnavailableFallback();
     return;
   }
 
@@ -2821,7 +2821,7 @@ function setupSpeech() {
 
   if (!SpeechRecognition) {
     showStatus(
-      "голос может быть недоступен в этом браузере, фразу можно написать",
+      getVoiceUnavailableMessage(),
     );
     return;
   }
@@ -2894,6 +2894,26 @@ function setupSpeech() {
 
     showStatus(getRecognitionErrorMessage());
   });
+}
+
+function showVoiceUnavailableFallback(message = getVoiceUnavailableMessage()) {
+  startButton.classList.remove("is-listening");
+  showStatus(message);
+
+  if (manualInput) {
+    manualInput.focus();
+  }
+}
+
+function getVoiceUnavailableMessage() {
+  return isIosDevice()
+    ? "на iPhone голос может не работать в установленном приложении, напиши вручную"
+    : "голос недоступен в этом браузере, напиши вручную";
+}
+
+function isIosDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 }
 
 function getRecognitionErrorMessage() {
