@@ -325,6 +325,12 @@ function initApp() {
 
     if (clearButton) {
       clearButton.addEventListener("click", () => {
+        const isConfirmed = window.confirm("Очистить все напоминания?");
+
+        if (!isConfirmed) {
+          return;
+        }
+
         items = [];
         saveItems();
         renderList();
@@ -1182,6 +1188,8 @@ function handleManualSubmit(event) {
 function normalizeManualInput(value) {
   return value
     .replace(/[\\/]+/g, " ")
+    .replace(/([а-яё])(\d)/gi, "$1 $2")
+    .replace(/(\d)([а-яё])/gi, "$1 $2")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -1221,7 +1229,7 @@ function handlePhrase(value, options = {}) {
   );
   clearPhraseSoon();
   scheduleItemNotifications(parsed);
-  return true;
+  return { type: "create", item: parsed };
 }
 
 function handleEditPhrase(value) {
@@ -1396,7 +1404,15 @@ function getRenamedItem(item, phrase) {
 }
 
 function getRecognizedPhraseText(phrase, result) {
-  if (!result || result.type !== "edit" || !result.item) {
+  if (!result || !result.item) {
+    return formatRecognizedPhraseText(phrase);
+  }
+
+  if (result.type === "create") {
+    return formatCreatedPhraseText(phrase, result.item);
+  }
+
+  if (result.type !== "edit") {
     return formatRecognizedPhraseText(phrase);
   }
 
@@ -1408,6 +1424,28 @@ function getRecognizedPhraseText(phrase, result) {
 
   const timeText = getItemTimeText(result.item);
   return timeText ? "Изменить время " + timeText : formatRecognizedPhraseText(phrase);
+}
+
+function formatCreatedPhraseText(phrase, item) {
+  const text = formatRecognizedPhraseText(phrase);
+  const timeText = getItemTimeText(item);
+
+  if (!timeText || item.period) {
+    return text;
+  }
+
+  const timePattern = /(?:^|\s)(?:(?:(?:в|на)\s+\d{1,2}(?:(?::|\.)\d{2})?)|(?:\d{1,2}(?:(?::|\.)\d{2}|\s*(?:часа?|часов)(?:\s*(?:и\s*)?\d{1,2}\s*(?:минут|минуты|минута))?)))(?:\s*(?:утра|вечера|дня|ночи))?(?=\s|$)/gi;
+  const matches = Array.from(text.matchAll(timePattern));
+  const match = matches[matches.length - 1];
+
+  if (!match) {
+    return `${text} ${timeText}`;
+  }
+
+  const startsWithSpace = /^\s/.test(match[0]);
+  const replacement = `${startsWithSpace ? " " : ""}в ${timeText}`;
+
+  return text.slice(0, match.index) + replacement + text.slice(match.index + match[0].length);
 }
 
 function formatRecognizedPhraseText(phrase) {
@@ -2470,7 +2508,7 @@ function parseExactDate(phrase, relative) {
 }
 
 function parseNumericExactDate(phrase) {
-  const match = phrase.match(/(?:^|\s)(?:до\s+)?(\d{1,2})[./-](\d{1,2})(?:[./-](\d{2}|\d{4}))?(?=\s|$)/);
+  const match = phrase.match(/(?:^|\s)(?:до\s+)?(\d{1,2})[./-](\d{1,2})(?:[./-](\d{2}|\d{4}))?\.?(?=\s|$)/);
 
   if (!match) {
     return null;
@@ -2604,7 +2642,7 @@ function cleanName(name) {
     name
       .replace(/\bсрок\b/g, "")
       .replace(/\bпредмет\b/g, "")
-      .replace(/\b(?:до\s+)?\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?\b/g, "")
+      .replace(/(?:^|\s)(?:до\s+)?\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?\.?(?=\s|$)/g, " ")
       .replace(/\b(?:до|на)\s+(сегодня|завтра|послезавтра)\b/g, "")
       .replace(/через\s+(полгода|пол\s+года|полгоду)/g, "")
       .replace(/через\s+(минуту|час|день|неделю|месяц|год|(\d+)\s*(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет))/g, "")
