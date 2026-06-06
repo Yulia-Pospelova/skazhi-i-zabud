@@ -212,6 +212,10 @@ h1 {
   line-height: 1.25;
 }
 
+.manual-input-wrap {
+  position: relative;
+}
+
 .manual-input {
   display: block;
   inline-size: 100%;
@@ -231,7 +235,22 @@ h1 {
 }
 
 .manual-input::placeholder {
+  color: transparent;
+}
+
+.manual-input-placeholder {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 14px;
   color: var(--color-muted);
+  font-size: 17px;
+  line-height: 1;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.manual-input:not(:placeholder-shown) + .manual-input-placeholder {
+  display: none;
 }
 
 .manual-input:focus-visible {
@@ -488,8 +507,9 @@ h1 {
 .edit-dialog,
 .calendar-dialog,
 .examples-dialog {
+  position: relative;
   inline-size: min(560px, 100%);
-  max-block-size: min(82dvb, 720px);
+  max-block-size: min(92dvb, 720px);
   padding: 16px;
   overflow: auto;
   overscroll-behavior: contain;
@@ -505,6 +525,14 @@ h1 {
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 12px;
+}
+
+.examples-dialog-head {
+  justify-content: center;
+}
+
+.examples-dialog .examples-panel {
+  overflow: visible;
 }
 
 .search-dialog h2,
@@ -682,6 +710,11 @@ h1 {
 }
 
 .search-ok-button {
+  inline-size: 100%;
+  margin-top: 12px;
+}
+
+.examples-close-button {
   inline-size: 100%;
   margin-top: 12px;
 }

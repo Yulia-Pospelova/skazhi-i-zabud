@@ -37,7 +37,7 @@
         <p class="notify-status" aria-live="polite"></p>
       </section>
 
-      <section class="capture" aria-label="напоминание">
+      <section class="capture" aria-label="напоминания">
         <p class="start-hint">нажми старт и скажи</p>
         <button
           class="start-button"
@@ -61,14 +61,19 @@
         </div>
 
         <form class="manual-form">
-          <p class="manual-hint">или напиши</p>
-          <input
-            class="manual-input"
-            type="text"
-            autocomplete="off"
-            aria-label="написать напоминание"
-            placeholder="название / дата / время"
-          />
+          <p class="manual-hint" aria-hidden="true">или напиши напоминание</p>
+          <div class="manual-input-wrap">
+            <input
+              class="manual-input"
+              type="text"
+              autocomplete="off"
+              aria-label="или напиши напоминание, название дата время"
+              placeholder=" "
+            />
+            <span class="manual-input-placeholder" aria-hidden="true">
+              название / дата / время
+            </span>
+          </div>
         </form>
 
         <button class="series-ok-button" type="button" hidden>
@@ -175,10 +180,11 @@
           id="examples-dialog"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="examples-dialog-title"
+          aria-label="инструкция"
+          tabindex="-1"
         >
           <div class="examples-dialog-head">
-            <h2 id="examples-dialog-title" tabindex="-1">как пользоваться</h2>
+            <h2 id="examples-dialog-title">как пользоваться</h2>
           </div>
           <div class="examples-panel">
             <h3 class="examples-title">Запись напоминания</h3>
@@ -198,7 +204,14 @@
             </div>
             <div class="examples-note">
               <h3 class="examples-title">Изменение напоминания</h3>
-              <p>Нажми <span class="button-name">изменить</span> и скажи: изменить название..., изменить дату..., изменить время, добавить время или удалить время.</p>
+              <p>Нажми <span class="button-name">изменить</span> и скажи одну из команд:</p>
+              <div class="examples-list">
+                <p>- изменить название</p>
+                <p>- изменить дату</p>
+                <p>- изменить время</p>
+                <p>- добавить время</p>
+                <p>- удалить время</p>
+              </div>
               <p>Также изменить дату можно с помощью иконки календарь.</p>
             </div>
             <div class="examples-note">

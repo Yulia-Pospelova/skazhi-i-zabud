@@ -539,12 +539,10 @@ function openExamplesDialog() {
   examplesModal.hidden = false;
   examplesButton.setAttribute("aria-expanded", "true");
   lockPageScroll();
-  const examplesTitle = document.querySelector("#examples-dialog-title");
+  const examplesDialog = document.querySelector(".examples-dialog");
 
-  if (examplesTitle) {
-    examplesTitle.focus();
-  } else {
-    examplesCloseButton.focus();
+  if (examplesDialog) {
+    examplesDialog.focus();
   }
 }
 
