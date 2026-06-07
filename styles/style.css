@@ -205,13 +205,6 @@ h1 {
   margin-top: 8px;
 }
 
-.manual-hint {
-  margin: 0 0 6px;
-  color: var(--color-muted);
-  font-size: 16px;
-  line-height: 1.25;
-}
-
 .manual-input-wrap {
   position: relative;
 }
