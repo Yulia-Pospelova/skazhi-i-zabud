@@ -134,57 +134,68 @@
         >
           <h2 id="edit-dialog-title">изменение напоминания</h2>
           <div class="edit-card"></div>
-          <p class="edit-hint">Скажи: изменить название, изменить дату, изменить время, добавить время или удалить время. Чтобы закончить, нажми ок.</p>
-          <button class="edit-ok-button" type="button">
-            ок
-          </button>
-        </div>
-      </div>
+          <div class="edit-mode-buttons" role="group" aria-label="способ изменения">
+            <button class="edit-voice-button" type="button">
+              голосом
+            </button>
+            <button class="edit-manual-button" type="button">
+              вручную
+            </button>
+          </div>
 
-      <div class="calendar-modal" hidden>
-        <div
-          class="calendar-dialog"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="calendar-dialog-title"
-        >
-          <div class="calendar-head">
-            <button class="calendar-prev-button" type="button" aria-label="предыдущий месяц">
-              ‹
-            </button>
-            <h2 id="calendar-dialog-title">календарь</h2>
-            <button class="calendar-next-button" type="button" aria-label="следующий месяц">
-              ›
+          <div class="edit-voice-panel">
+            <p class="edit-hint">Нажми кнопку и скажи, например:</p>
+            <div class="edit-examples">
+              <p>- изменить дату на завтра</p>
+              <p>- изменить время на 15:00</p>
+              <p>- изменить название на врач</p>
+              <p>- удалить время</p>
+            </div>
+            <button class="edit-voice-start-button" type="button">
+              сказать
             </button>
           </div>
-          <div class="calendar-weekdays" aria-hidden="true">
-            <span>пн</span>
-            <span>вт</span>
-            <span>ср</span>
-            <span>чт</span>
-            <span>пт</span>
-            <span>сб</span>
-            <span>вс</span>
-          </div>
-          <div class="calendar-grid"></div>
-          <form class="calendar-time-form">
-            <label class="calendar-time-label" for="calendar-time-input">
-              время
-            </label>
-            <div class="calendar-time-row">
-              <input
-                class="calendar-time-input"
-                id="calendar-time-input"
-                type="time"
-                autocomplete="off"
-                step="60"
-              />
-              <button class="calendar-clear-time-button" type="button">
-                без времени
+
+          <div class="edit-manual-panel" hidden>
+            <div class="calendar-head">
+              <button class="calendar-prev-button" type="button" aria-label="предыдущий месяц">
+                ‹
+              </button>
+              <h3 id="calendar-dialog-title">календарь</h3>
+              <button class="calendar-next-button" type="button" aria-label="следующий месяц">
+                ›
               </button>
             </div>
-          </form>
-          <button class="calendar-close-button" type="button">
+            <div class="calendar-weekdays" aria-hidden="true">
+              <span>пн</span>
+              <span>вт</span>
+              <span>ср</span>
+              <span>чт</span>
+              <span>пт</span>
+              <span>сб</span>
+              <span>вс</span>
+            </div>
+            <div class="calendar-grid"></div>
+            <form class="calendar-time-form">
+              <label class="calendar-time-label" for="calendar-time-input">
+                время
+              </label>
+              <div class="calendar-time-row">
+                <input
+                  class="calendar-time-input"
+                  id="calendar-time-input"
+                  type="time"
+                  autocomplete="off"
+                  step="60"
+                />
+                <button class="calendar-clear-time-button" type="button">
+                  без времени
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <button class="edit-ok-button" type="button">
             ок
           </button>
         </div>

@@ -453,20 +453,6 @@ h1 {
   text-align: center;
   font-weight: 700;
   line-height: 1.2;
-  cursor: pointer;
-}
-
-.item-days::after,
-.edit-card-days::after,
-.search-result-days::after {
-  content: "";
-  inline-size: 14px;
-  block-size: 14px;
-  flex: 0 0 auto;
-  border: 2px solid var(--color-primary);
-  border-block-start-width: 5px;
-  border-radius: 3px;
-  background: var(--color-surface);
 }
 
 .item-actions {
@@ -581,8 +567,14 @@ h1 {
   margin-bottom: 14px;
 }
 
-.calendar-dialog h2 {
+.calendar-dialog h2,
+.calendar-head h3 {
   text-align: center;
+}
+
+.calendar-head h3 {
+  margin: 0;
+  font-size: 20px;
 }
 
 .calendar-prev-button,
@@ -747,6 +739,68 @@ h1 {
   text-align: center;
   font-weight: 700;
   line-height: 1.2;
+}
+
+.edit-mode-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.edit-voice-button,
+.edit-manual-button {
+  min-block-size: 42px;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--color-muted);
+  background: var(--color-control);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.edit-voice-button.is-active,
+.edit-manual-button.is-active {
+  color: var(--color-surface);
+  background: var(--color-primary);
+}
+
+.edit-voice-panel,
+.edit-manual-panel {
+  margin-top: 12px;
+}
+
+.edit-voice-panel[hidden],
+.edit-manual-panel[hidden] {
+  display: none;
+}
+
+.edit-examples {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.edit-examples p {
+  margin: 0;
+}
+
+.edit-voice-start-button {
+  inline-size: 100%;
+  min-block-size: 96px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--color-surface);
+  background: var(--color-primary);
+  font: inherit;
+  font-size: 28px;
+  font-weight: 700;
   cursor: pointer;
 }
 

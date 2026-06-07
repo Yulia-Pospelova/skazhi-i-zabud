@@ -21,12 +21,15 @@ let searchOkButton = null;
 let editModal = null;
 let editCard = null;
 let editOkButton = null;
-let calendarModal = null;
+let editVoiceButton = null;
+let editManualButton = null;
+let editVoiceStartButton = null;
+let editVoicePanel = null;
+let editManualPanel = null;
 let calendarTitle = null;
 let calendarGrid = null;
 let calendarPrevButton = null;
 let calendarNextButton = null;
-let calendarCloseButton = null;
 let calendarTimeForm = null;
 let calendarTimeInput = null;
 let calendarClearTimeButton = null;
@@ -389,6 +392,18 @@ function initApp() {
       editOkButton.addEventListener("click", closeEditDialog);
     }
 
+    if (editVoiceButton) {
+      editVoiceButton.addEventListener("click", showVoiceEditPanel);
+    }
+
+    if (editManualButton) {
+      editManualButton.addEventListener("click", showManualEditPanel);
+    }
+
+    if (editVoiceStartButton) {
+      editVoiceStartButton.addEventListener("click", startEditVoiceListening);
+    }
+
     if (searchModal) {
       searchModal.addEventListener("click", (event) => {
         if (event.target === searchModal) {
@@ -417,10 +432,6 @@ function initApp() {
       });
     }
 
-    if (calendarCloseButton) {
-      calendarCloseButton.addEventListener("click", closeCalendarDialog);
-    }
-
     if (calendarTimeForm) {
       calendarTimeForm.addEventListener("submit", handleCalendarTimeSubmit);
     }
@@ -431,14 +442,6 @@ function initApp() {
 
     if (calendarGrid) {
       calendarGrid.addEventListener("click", handleCalendarGridClick);
-    }
-
-    if (calendarModal) {
-      calendarModal.addEventListener("click", (event) => {
-        if (event.target === calendarModal) {
-          closeCalendarDialog();
-        }
-      });
     }
 
     if (examplesCloseButton) {
@@ -483,12 +486,15 @@ function assignElements() {
   editModal = document.querySelector(".edit-modal");
   editCard = document.querySelector(".edit-card");
   editOkButton = document.querySelector(".edit-ok-button");
-  calendarModal = document.querySelector(".calendar-modal");
+  editVoiceButton = document.querySelector(".edit-voice-button");
+  editManualButton = document.querySelector(".edit-manual-button");
+  editVoiceStartButton = document.querySelector(".edit-voice-start-button");
+  editVoicePanel = document.querySelector(".edit-voice-panel");
+  editManualPanel = document.querySelector(".edit-manual-panel");
   calendarTitle = document.querySelector("#calendar-dialog-title");
   calendarGrid = document.querySelector(".calendar-grid");
   calendarPrevButton = document.querySelector(".calendar-prev-button");
   calendarNextButton = document.querySelector(".calendar-next-button");
-  calendarCloseButton = document.querySelector(".calendar-close-button");
   calendarTimeForm = document.querySelector(".calendar-time-form");
   calendarTimeInput = document.querySelector(".calendar-time-input");
   calendarClearTimeButton = document.querySelector(".calendar-clear-time-button");
@@ -605,11 +611,6 @@ function closeExamplesDialog(options = {}) {
 }
 
 function handleDocumentKeydown(event) {
-  if (event.key === "Escape" && isCalendarDialogOpen()) {
-    closeCalendarDialog();
-    return;
-  }
-
   if (event.key === "Escape" && isEditDialogOpen()) {
     closeEditDialog();
     return;
@@ -632,11 +633,6 @@ function handleDocumentKeydown(event) {
 
   if (event.key === "Tab" && isEditDialogOpen()) {
     keepFocusInsideDialog(event, editModal);
-    return;
-  }
-
-  if (event.key === "Tab" && isCalendarDialogOpen()) {
-    keepFocusInsideDialog(event, calendarModal);
     return;
   }
 
@@ -1128,7 +1124,7 @@ function createSearchResult(item) {
   const name = document.createElement("h3");
   const date = document.createElement("p");
   const time = document.createElement("p");
-  const days = document.createElement("button");
+  const days = document.createElement("p");
   const actions = document.createElement("div");
   const editButton = document.createElement("button");
   const deleteButton = document.createElement("button");
@@ -1147,7 +1143,6 @@ function createSearchResult(item) {
   editButton.type = "button";
   deleteButton.type = "button";
   closeButton.type = "button";
-  days.type = "button";
   editButton.setAttribute("aria-label", `изменить напоминание ${formatDisplayName(item.name)}`);
   deleteButton.setAttribute("aria-label", `удалить напоминание ${formatDisplayName(item.name)}`);
   closeButton.setAttribute("aria-label", `убрать из окна напоминание ${formatDisplayName(item.name)}`);
@@ -1173,10 +1168,6 @@ function createSearchResult(item) {
   closeButton.addEventListener("click", () => {
     removeSearchResult(item.id);
   });
-  days.addEventListener("click", () => {
-    openCalendarDialog(item);
-  });
-
   content.append(name, date, time, days);
   actions.append(editButton, deleteButton, closeButton);
   result.append(content, actions);
@@ -1712,24 +1703,8 @@ function refreshAfterEditModalUpdate(updatedItem) {
   refreshSearchDialog();
 }
 
-function openCalendarDialog(item) {
-  if (!calendarModal || !calendarGrid || !calendarTitle || !calendarCloseButton) {
-    return;
-  }
-
-  const date = parseIsoDate(item.date);
-  calendarItemId = item.id;
-  calendarYear = date.getFullYear();
-  calendarMonth = date.getMonth();
-  calendarModal.hidden = false;
-  renderCalendarTimeInput(item);
-  renderCalendar();
-  lockPageScroll();
-  calendarCloseButton.focus();
-}
-
 function closeCalendarDialog() {
-  if (!calendarModal) {
+  if (!editManualPanel) {
     return;
   }
 
@@ -1737,16 +1712,12 @@ function closeCalendarDialog() {
     return;
   }
 
-  calendarModal.hidden = true;
+  editManualPanel.hidden = true;
   calendarItemId = null;
-
-  if (!isSearchDialogOpen() && !isEditDialogOpen()) {
-    unlockPageScroll();
-  }
 }
 
 function isCalendarDialogOpen() {
-  return Boolean(calendarModal && !calendarModal.hidden);
+  return Boolean(editManualPanel && !editManualPanel.hidden);
 }
 
 function changeCalendarMonth(offset) {
@@ -2194,6 +2165,10 @@ function finishEditing() {
   if (editModal) {
     editModal.hidden = true;
   }
+  calendarItemId = null;
+  if (editManualPanel) {
+    editManualPanel.hidden = true;
+  }
   if (wasEditDialogOpen && !isSearchDialogOpen()) {
     unlockPageScroll();
   }
@@ -2207,6 +2182,7 @@ function openEditDialog(item) {
 
   editModal.hidden = false;
   renderEditDialogItem(item);
+  showVoiceEditPanel();
 
   if (!isSearchDialogOpen()) {
     lockPageScroll();
@@ -2215,14 +2191,91 @@ function openEditDialog(item) {
   editOkButton.focus();
 }
 
+function showVoiceEditPanel() {
+  if (isCalendarDialogOpen() && applyCalendarTimeInput() === "invalid") {
+    return;
+  }
+
+  if (editVoicePanel) {
+    editVoicePanel.hidden = false;
+  }
+
+  if (editManualPanel) {
+    editManualPanel.hidden = true;
+  }
+
+  if (editVoiceButton) {
+    editVoiceButton.classList.add("is-active");
+  }
+
+  if (editManualButton) {
+    editManualButton.classList.remove("is-active");
+  }
+}
+
+function showManualEditPanel() {
+  const item = items.find((currentItem) => currentItem.id === editingItemId);
+
+  if (!item || !editManualPanel) {
+    return;
+  }
+
+  if (editVoicePanel) {
+    editVoicePanel.hidden = true;
+  }
+
+  editManualPanel.hidden = false;
+
+  if (editVoiceButton) {
+    editVoiceButton.classList.remove("is-active");
+  }
+
+  if (editManualButton) {
+    editManualButton.classList.add("is-active");
+  }
+
+  const date = parseIsoDate(item.date);
+  calendarItemId = item.id;
+  calendarYear = date.getFullYear();
+  calendarMonth = date.getMonth();
+  renderCalendarTimeInput(item);
+  renderCalendar();
+}
+
+function startEditVoiceListening() {
+  if (!recognition) {
+    showVoiceUnavailableFallback("голосовое изменение недоступно в этом браузере");
+    return;
+  }
+
+  if (!editingItemId) {
+    return;
+  }
+
+  isSeriesActive = false;
+  setRecognitionContinuous(false);
+  startButton.classList.add("is-listening");
+  showStatus("скажи команду изменения");
+  resetEditModalTimer();
+  restartRecognition();
+}
+
 function closeEditDialog() {
   if (!editModal) {
+    return;
+  }
+
+  if (isCalendarDialogOpen() && applyCalendarTimeInput() === "invalid") {
     return;
   }
 
   editModal.hidden = true;
   clearTimeout(editModalTimer);
   editingItemId = null;
+  calendarItemId = null;
+  if (editManualPanel) {
+    editManualPanel.hidden = true;
+  }
   stopSeriesListening();
   items = sortByDate(items);
   saveItems();
@@ -2260,22 +2313,18 @@ function renderEditDialogItem(item) {
   const name = document.createElement("p");
   const date = document.createElement("p");
   const time = document.createElement("p");
-  const days = document.createElement("button");
+  const days = document.createElement("p");
 
   name.className = "edit-card-name";
   date.className = "edit-card-date";
   time.className = "edit-card-time";
   days.className = "edit-card-days";
-  days.type = "button";
 
   appendLabeledText(name, "название", formatDisplayName(item.name));
   appendLabeledText(date, "дата", getItemDateText(item));
   appendLabeledText(time, "время", getItemTimeText(item));
   time.hidden = !getItemTimeText(item);
   days.textContent = formatDaysLeftVisible(item.date);
-  days.addEventListener("click", () => {
-    openCalendarDialog(item);
-  });
 
   editCard.append(name, date, time, days);
 }
@@ -2310,11 +2359,6 @@ function cancelSearch() {
 }
 
 function startEditingItem(id) {
-  if (!recognition) {
-    showVoiceUnavailableFallback("голосовое изменение недоступно в этом браузере");
-    return;
-  }
-
   const item = items.find((currentItem) => currentItem.id === id);
 
   if (!item) {
@@ -2327,9 +2371,6 @@ function startEditingItem(id) {
   setRecognitionContinuous(false);
   clearEditButtonFocus(id);
   openEditDialog(item);
-  startButton.classList.add("is-listening");
-  showStatus("скажи команду изменения");
-  restartRecognition();
 }
 
 function clearEditButtonFocus(id) {
@@ -3228,7 +3269,7 @@ function renderList() {
     const screenReaderName = document.createElement("span");
     const screenReaderDate = document.createElement("span");
     const screenReaderTime = document.createElement("span");
-    const days = document.createElement("button");
+    const days = document.createElement("p");
     const visibleDays = document.createElement("span");
     const screenReaderDays = document.createElement("span");
     const editButton = document.createElement("button");
@@ -3253,7 +3294,6 @@ function renderList() {
     screenReaderDeleteText.className = "visually-hidden";
     editButton.type = "button";
     deleteButton.type = "button";
-    days.type = "button";
     editButton.dataset.itemId = item.id;
 
     appendLabeledText(visibleName, "название", formatDisplayName(item.name));
@@ -3280,9 +3320,6 @@ function renderList() {
     });
     deleteButton.addEventListener("click", () => {
       deleteItem(item.id);
-    });
-    days.addEventListener("click", () => {
-      openCalendarDialog(item);
     });
 
     days.append(visibleDays, screenReaderDays);
@@ -3439,7 +3476,7 @@ function isIosDevice() {
 
 function getRecognitionErrorMessage() {
   if (editingItemId) {
-    return "Голос не сработал, нажми изменить еще раз";
+    return "Голос не сработал, нажми сказать еще раз";
   }
 
   if (isSearchActive) {
