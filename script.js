@@ -436,6 +436,12 @@ function initApp() {
       calendarTimeForm.addEventListener("submit", handleCalendarTimeSubmit);
     }
 
+    if (calendarTimeInput) {
+      calendarTimeInput.addEventListener("change", () => {
+        applyCalendarTimeInput({ announce: true });
+      });
+    }
+
     if (calendarClearTimeButton) {
       calendarClearTimeButton.addEventListener("click", clearCalendarItemTime);
     }
