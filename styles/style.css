@@ -379,6 +379,35 @@ h1 {
   white-space: nowrap;
 }
 
+.debug-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 2px dashed #7f9489;
+  border-radius: var(--radius);
+  background: #f8fbf9;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.debug-panel h2 {
+  margin: 0 0 6px;
+  color: var(--color-text);
+  font-size: 16px;
+  text-align: left;
+}
+
+.debug-panel p {
+  margin: 0 0 8px;
+}
+
+.debug-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
 .item {
   display: grid;
   grid-template-columns: 1fr auto auto;

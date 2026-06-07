@@ -29,11 +29,15 @@ let calendarNextButton = null;
 let calendarCloseButton = null;
 let list = null;
 let topButton = null;
+let debugPanel = null;
+let debugList = null;
 
 const STORAGE_KEY = "expiry-reminders";
+const AI_DEBUG_STORAGE_KEY = "expiry-reminders-ai-debug";
 // После публикации Cloudflare Worker вставить сюда его адрес.
 const AI_PROXY_URL = "https://skazhi-ai-parser.muha2308.workers.dev";
 const AI_REQUEST_TIMEOUT_MS = 3500;
+const DEBUG_MODE = new URLSearchParams(window.location.search).has("debug");
 const MESSAGE_VISIBLE_MS = 4000;
 const SHORT_MESSAGE_VISIBLE_MS = 2200;
 const SINGLE_CLICK_DELAY_MS = 420;
@@ -307,6 +311,7 @@ function initApp() {
     setupSpeech();
     scheduleAllNotifications();
     registerServiceWorker();
+    setupDebugPanel();
 
     if (startButton) {
       startButton.addEventListener("click", handleStartClick);
@@ -464,6 +469,8 @@ function assignElements() {
   calendarCloseButton = document.querySelector(".calendar-close-button");
   list = document.querySelector(".list");
   topButton = document.querySelector(".top-button");
+  debugPanel = document.querySelector(".debug-panel");
+  debugList = document.querySelector(".debug-list");
 }
 
 function scrollToAppTop() {
@@ -1294,7 +1301,73 @@ function normalizeInputForAI(value) {
 }
 
 function logAIProblem(reason, details = {}) {
+  const entry = {
+    reason,
+    details,
+    time: new Date().toLocaleString("ru-RU"),
+  };
+
   console.warn("[AI parser fallback]", reason, details);
+  saveAIDebugEntry(entry);
+  renderDebugPanel();
+}
+
+function setupDebugPanel() {
+  if (!debugPanel) {
+    return;
+  }
+
+  if (!DEBUG_MODE) {
+    debugPanel.hidden = true;
+    return;
+  }
+
+  debugPanel.hidden = false;
+  renderDebugPanel();
+}
+
+function saveAIDebugEntry(entry) {
+  try {
+    const entries = loadAIDebugEntries();
+    entries.unshift(entry);
+    localStorage.setItem(AI_DEBUG_STORAGE_KEY, JSON.stringify(entries.slice(0, 10)));
+  } catch (error) {
+    console.warn("AI debug save failed", error);
+  }
+}
+
+function loadAIDebugEntries() {
+  try {
+    const rawEntries = localStorage.getItem(AI_DEBUG_STORAGE_KEY);
+    const entries = rawEntries ? JSON.parse(rawEntries) : [];
+    return Array.isArray(entries) ? entries : [];
+  } catch (error) {
+    console.warn("AI debug load failed", error);
+    return [];
+  }
+}
+
+function renderDebugPanel() {
+  if (!DEBUG_MODE || !debugList) {
+    return;
+  }
+
+  const entries = loadAIDebugEntries();
+  debugList.innerHTML = "";
+
+  if (!entries.length) {
+    const emptyItem = document.createElement("li");
+    emptyItem.textContent = "пока ошибок нет";
+    debugList.append(emptyItem);
+    return;
+  }
+
+  entries.forEach((entry) => {
+    const item = document.createElement("li");
+    const phrase = entry.details?.phrase ? `: ${entry.details.phrase}` : "";
+    item.textContent = `${entry.time} - ${entry.reason}${phrase}`;
+    debugList.append(item);
+  });
 }
 
 function createItemFromAIData(data, source) {
