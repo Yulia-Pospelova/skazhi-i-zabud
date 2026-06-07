@@ -33,6 +33,7 @@ let topButton = null;
 const STORAGE_KEY = "expiry-reminders";
 // После публикации Cloudflare Worker вставить сюда его адрес.
 const AI_PROXY_URL = "https://skazhi-ai-parser.muha2308.workers.dev";
+const AI_REQUEST_TIMEOUT_MS = 3500;
 const MESSAGE_VISIBLE_MS = 4000;
 const SHORT_MESSAGE_VISIBLE_MS = 2200;
 const SINGLE_CLICK_DELAY_MS = 420;
@@ -1246,11 +1247,16 @@ async function parsePhraseWithAI(value) {
   }
 
   const normalizedValue = normalizeInputForAI(value);
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => {
+    controller.abort();
+  }, AI_REQUEST_TIMEOUT_MS);
 
   try {
     const response = await fetch(AI_PROXY_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
       body: JSON.stringify({
         text: normalizedValue,
         now: new Date().toISOString(),
@@ -1259,13 +1265,23 @@ async function parsePhraseWithAI(value) {
     });
 
     if (!response.ok) {
+      logAIProblem("bad-response", {
+        status: response.status,
+        phrase: normalizedValue,
+      });
       return null;
     }
 
     const data = await response.json();
     return createItemFromAIData(data, value);
   } catch (error) {
+    logAIProblem(error.name === "AbortError" ? "timeout" : "request-error", {
+      phrase: normalizedValue,
+      message: error.message,
+    });
     return null;
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
 
@@ -1275,6 +1291,10 @@ function normalizeInputForAI(value) {
     .replace(/(\d)([а-яё])/gi, "$1 $2")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function logAIProblem(reason, details = {}) {
+  console.warn("[AI parser fallback]", reason, details);
 }
 
 function createItemFromAIData(data, source) {
