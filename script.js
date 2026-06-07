@@ -1245,12 +1245,14 @@ async function parsePhraseWithAI(value) {
     return null;
   }
 
+  const normalizedValue = normalizeInputForAI(value);
+
   try {
     const response = await fetch(AI_PROXY_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        text: value,
+        text: normalizedValue,
         now: new Date().toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       }),
@@ -1265,6 +1267,14 @@ async function parsePhraseWithAI(value) {
   } catch (error) {
     return null;
   }
+}
+
+function normalizeInputForAI(value) {
+  return value
+    .replace(/([а-яё])(\d)/gi, "$1 $2")
+    .replace(/(\d)([а-яё])/gi, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function createItemFromAIData(data, source) {

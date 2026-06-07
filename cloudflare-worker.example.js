@@ -1,10 +1,6 @@
 export default {
   async fetch(request, env) {
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type",
-    };
+    const corsHeaders = getCorsHeaders(request);
 
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders });
@@ -42,6 +38,8 @@ export default {
         "- time строго в формате HH:MM или null.",
         "- period: если сказано утром, днем, днём, вечером или ночью без точного времени, верни это слово; иначе null.",
         "- displayDate: только если дата неточная и ее нужно показать словами, например 'август' или 'в середине мая 2027 года'; иначе пустая строка.",
+        "- Если во фразе нет даты, времени, части дня или относительного срока, верни null. Не ставь сегодняшнюю дату сам.",
+        "- Если во фразе есть только дата без названия, например 'послезавтра', верни null.",
         "- Если дату действительно понять нельзя, верни null вместо JSON.",
         "",
         "Относительные даты:",
@@ -79,6 +77,10 @@ export default {
         "- 'в 12' без уточнения = 12:00.",
         "- 'в 8', 'в 9', 'в 10', 'в 11' без уточнения = 08:00, 09:00, 10:00, 11:00.",
         "- 'в 1', 'в 2', 'в 3', 'в 4', 'в 5', 'в 6', 'в 7' без уточнения = 13:00, 14:00, 15:00, 16:00, 17:00, 18:00, 19:00.",
+        "- '1 час', '2 часа', '3 часа', '4 часа', '5 часов', '6 часов', '7 часов' как время без уточнения = 13:00, 14:00, 15:00, 16:00, 17:00, 18:00, 19:00.",
+        "- Если во фразе есть дата/месяц и после нее сказано '1 час', '2 часа', '3 часа', '4 часа', '5 часов', '6 часов' или '7 часов', это время события, а не длительность. Например: 'тест 2 января 4 часа' = date 2 января, time 16:00.",
+        "- Никогда не возвращай 04:00 для '4 часа', если во фразе нет слов 'утра', 'ночью' или 'ночи'. Без уточнения '4 часа' = 16:00.",
+        "- '8 часов', '9 часов', '10 часов', '11 часов' как время без уточнения = 08:00, 09:00, 10:00, 11:00.",
         "- Если сказано 'утра', оставь утреннее время.",
         "- Если сказано 'дня' или 'вечера', используй 24-часовой формат после полудня.",
         "- Понимай 'в 2 часа 30 минут', 'в 2:30', 'в 14.30'.",
@@ -145,6 +147,23 @@ export default {
     }
   },
 };
+
+function getCorsHeaders(request) {
+  const allowedOrigins = new Set([
+    "https://yulia-pospelova.github.io",
+  ]);
+  const origin = request.headers.get("Origin");
+  const allowedOrigin = allowedOrigins.has(origin)
+    ? origin
+    : "https://yulia-pospelova.github.io";
+
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Vary": "Origin",
+  };
+}
 
 function jsonResponse(data, status, headers) {
   return new Response(JSON.stringify(data), {
