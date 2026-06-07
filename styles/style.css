@@ -672,6 +672,11 @@ h1 {
   font-size: 16px;
 }
 
+.calendar-time-input:focus-visible {
+  border-color: var(--color-primary);
+  outline: none;
+}
+
 .calendar-clear-time-button {
   min-block-size: 42px;
   padding: 0 10px;
