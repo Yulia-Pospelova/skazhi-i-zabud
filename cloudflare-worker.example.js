@@ -14,13 +14,73 @@ export default {
     }
 
     try {
-      const { text, now, timezone } = await request.json();
+      const { text, now, timezone, mode } = await request.json();
 
       if (!text || typeof text !== "string") {
         return jsonResponse({ error: "Text is required" }, 400, corsHeaders);
       }
 
-      const systemPrompt = [
+      const systemPrompt = mode === "search"
+        ? getSearchSystemPrompt(now, timezone)
+        : getReminderSystemPrompt(now, timezone);
+
+      const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "x-api-key": env.ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 300,
+          temperature: 0,
+          system: systemPrompt,
+          messages: [
+            {
+              role: "user",
+              content: text,
+            },
+          ],
+        }),
+      });
+
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+
+        return jsonResponse(
+          {
+            error: "AI request failed",
+            status: aiResponse.status,
+            details: errorText,
+          },
+          502,
+          corsHeaders,
+        );
+      }
+
+      const aiData = await aiResponse.json();
+      const answerText = aiData.content?.[0]?.text?.trim() || "";
+      const cleanText = answerText.replace(/```json|```/g, "").trim();
+
+      if (cleanText === "null") {
+        return jsonResponse(null, 200, corsHeaders);
+      }
+
+      return new Response(cleanText, {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json; charset=utf-8",
+        },
+      });
+    } catch (error) {
+      return jsonResponse({ error: "Worker error" }, 500, corsHeaders);
+    }
+  },
+};
+
+function getReminderSystemPrompt(now, timezone) {
+  return [
         "Ты разбираешь русские напоминания для приложения 'скажи и забудь'.",
         "Пользователь говорит или пишет одну фразу для создания нового напоминания.",
         "Не обрабатывай поиск, удаление, очистку списка и изменение существующей записи.",
@@ -91,62 +151,39 @@ export default {
         '{"name":"стрижка","date":"завтрашняя дата","time":"17:00","period":null,"displayDate":""} для фразы "стрижка завтра в 5 часов".',
         '{"name":"завтрак","date":"завтрашняя дата","time":null,"period":"утром","displayDate":""} для фразы "завтрак завтра утром".',
         '{"name":"лекарство","date":"YYYY-08-01","time":null,"period":null,"displayDate":"август"} для фразы "лекарство до августа".',
-      ].join("\n");
+  ].join("\n");
+}
 
-      const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          "x-api-key": env.ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 300,
-          temperature: 0,
-          system: systemPrompt,
-          messages: [
-            {
-              role: "user",
-              content: text,
-            },
-          ],
-        }),
-      });
-
-      if (!aiResponse.ok) {
-        const errorText = await aiResponse.text();
-
-        return jsonResponse(
-          {
-            error: "AI request failed",
-            status: aiResponse.status,
-            details: errorText,
-          },
-          502,
-          corsHeaders,
-        );
-      }
-
-      const aiData = await aiResponse.json();
-      const answerText = aiData.content?.[0]?.text?.trim() || "";
-      const cleanText = answerText.replace(/```json|```/g, "").trim();
-
-      if (cleanText === "null") {
-        return jsonResponse(null, 200, corsHeaders);
-      }
-
-      return new Response(cleanText, {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json; charset=utf-8",
-        },
-      });
-    } catch (error) {
-      return jsonResponse({ error: "Worker error" }, 500, corsHeaders);
-    }
-  },
-};
+function getSearchSystemPrompt(now, timezone) {
+  return [
+    "Ты разбираешь русские поисковые запросы для приложения напоминаний 'скажи и забудь'.",
+    "Пользователь хочет найти уже сохраненные напоминания, а не создать новое.",
+    `Текущие дата и время: ${now}`,
+    `Часовой пояс пользователя: ${timezone}`,
+    "",
+    "Верни только JSON без markdown и без пояснений.",
+    "Если запрос не похож на поиск, верни null.",
+    "",
+    "Форматы:",
+    '{"type":"name","query":"врач"}',
+    '{"type":"date","date":"YYYY-MM-DD"}',
+    '{"type":"range","startDate":"YYYY-MM-DD","endDate":"YYYY-MM-DD"}',
+    '{"type":"month","year":2027,"month":7}',
+    '{"type":"year","year":2027}',
+    '{"type":"soon","days":7}',
+    "",
+    "Правила:",
+    "- type name: если ищут по названию или смыслу, например 'покажи врачей', 'найди паспорт', 'где стрижка'. query верни коротко без слов 'найди', 'покажи', 'что у меня'.",
+    "- type date: если названа конкретная дата, например 'что завтра', 'на 5 июня', 'послезавтра'.",
+    "- type range: если назван период, например 'на следующей неделе', 'в начале месяца', 'в конце следующего месяца'.",
+    "- type month: если назван месяц целиком, например 'июль', 'что в августе', 'в следующем месяце'. month от 1 до 12.",
+    "- type year: если назван год целиком, например 'в следующем году', 'в 2028 году'.",
+    "- type soon: для фраз 'что скоро', 'ближайшее', 'срочное'. days = 7.",
+    "- 'просрочено' = range от 1900-01-01 до вчерашней даты.",
+    "- Понимай дни недели, месяцы, 'через неделю', 'через 2 недели', 'через месяц'.",
+    "- Если год не назван и месяц/дата уже прошли, используй следующий год.",
+  ].join("\n");
+}
 
 function getCorsHeaders(request) {
   const allowedOrigins = new Set([

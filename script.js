@@ -631,7 +631,7 @@ function handleDocumentKeydown(event) {
   }
 }
 
-function handleSearchPhrase(value) {
+async function handleSearchPhrase(value) {
   const query = normalizeSearchText(value);
 
   if (!query) {
@@ -639,7 +639,12 @@ function handleSearchPhrase(value) {
     return false;
   }
 
-  const matches = findItemsBySearchQuery(query);
+  const localMatches = findItemsBySearchQuery(query);
+  const aiSearch = shouldUseAISearch(query, localMatches)
+    ? await parseSearchWithAI(value)
+    : null;
+  const aiMatches = aiSearch ? findItemsByAISearch(aiSearch) : [];
+  const matches = mergeSearchMatches(localMatches, aiMatches);
   cancelSearch();
 
   if (!matches.length) {
@@ -695,6 +700,67 @@ function findItemsBySearchQuery(query) {
   }
 
   return findItemsByName(query);
+}
+
+function findItemsByAISearch(search) {
+  if (!search || typeof search !== "object") {
+    return [];
+  }
+
+  switch (search.type) {
+    case "name":
+      return search.query ? findItemsByName(normalizeSearchText(search.query)) : [];
+    case "date":
+      return isValidAIISODate(search.date) ? findItemsByDate(parseIsoDate(search.date)) : [];
+    case "range":
+      return isValidAIISODate(search.startDate) && isValidAIISODate(search.endDate)
+        ? findItemsByDateRange(parseIsoDate(search.startDate), parseIsoDate(search.endDate))
+        : [];
+    case "month":
+      return Number.isInteger(search.year) && Number.isInteger(search.month)
+        ? findItemsByMonth(search.year, search.month - 1)
+        : [];
+    case "year":
+      return Number.isInteger(search.year) ? findItemsByYear(search.year) : [];
+    case "soon":
+      return findSoonItems(search.days);
+    default:
+      return [];
+  }
+}
+
+function findSoonItems(days = 7) {
+  const startDate = startOfToday();
+  const endDate = startOfToday();
+  const amount = Number.isFinite(days) ? days : 7;
+  endDate.setDate(endDate.getDate() + Math.max(1, Math.min(amount, 30)));
+
+  return findItemsByDateRange(startDate, endDate);
+}
+
+function mergeSearchMatches(...matchGroups) {
+  const result = [];
+  const usedIds = new Set();
+
+  matchGroups.flat().forEach((item) => {
+    if (!item || usedIds.has(item.id)) {
+      return;
+    }
+
+    usedIds.add(item.id);
+    result.push(item);
+  });
+
+  return sortByDate(result);
+}
+
+function shouldUseAISearch(query, localMatches) {
+  if (!AI_PROXY_URL) {
+    return false;
+  }
+
+  return !localMatches.length ||
+    /\b(скоро|срочн|ближайш|просроч|что\s+у\s+меня|какие\s+у\s+меня|покажи|найди|где)\b/.test(query);
 }
 
 function findItemsByName(query) {
@@ -1301,6 +1367,75 @@ async function parsePhraseWithAI(value) {
   } finally {
     window.clearTimeout(timeoutId);
   }
+}
+
+async function parseSearchWithAI(value) {
+  if (!AI_PROXY_URL) {
+    return null;
+  }
+
+  const normalizedValue = normalizeInputForAI(value);
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => {
+    controller.abort();
+  }, AI_REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(AI_PROXY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        mode: "search",
+        text: normalizedValue,
+        now: new Date().toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }),
+    });
+
+    if (!response.ok) {
+      logAIProblem("search-bad-response", {
+        status: response.status,
+        phrase: normalizedValue,
+      });
+      return null;
+    }
+
+    const data = await response.json();
+    return normalizeAISearchData(data, normalizedValue);
+  } catch (error) {
+    logAIProblem(error.name === "AbortError" ? "search-timeout" : "search-request-error", {
+      phrase: normalizedValue,
+      message: error.message,
+    });
+    return null;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function normalizeAISearchData(data, phrase) {
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+
+  const type = getAIString(data.type);
+
+  if (!["name", "date", "range", "month", "year", "soon"].includes(type)) {
+    logAIProblem("search-invalid-type", { phrase, type });
+    return null;
+  }
+
+  return {
+    type,
+    query: getAIString(data.query),
+    date: getAIString(data.date),
+    startDate: getAIString(data.startDate),
+    endDate: getAIString(data.endDate),
+    year: Number(data.year),
+    month: Number(data.month),
+    days: Number(data.days),
+  };
 }
 
 function normalizeInputForAI(value) {
@@ -3127,7 +3262,7 @@ function setupSpeech() {
     }
 
     const result = isSearchActive
-      ? handleSearchPhrase(phrase)
+      ? await handleSearchPhrase(phrase)
       : editingItemId
         ? handleEditPhrase(phrase)
         : await handlePhrase(phrase, { fromSpeech: true });
