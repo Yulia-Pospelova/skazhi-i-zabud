@@ -27,6 +27,9 @@ let calendarGrid = null;
 let calendarPrevButton = null;
 let calendarNextButton = null;
 let calendarCloseButton = null;
+let calendarTimeForm = null;
+let calendarTimeInput = null;
+let calendarClearTimeButton = null;
 let list = null;
 let topButton = null;
 let debugPanel = null;
@@ -418,6 +421,14 @@ function initApp() {
       calendarCloseButton.addEventListener("click", closeCalendarDialog);
     }
 
+    if (calendarTimeForm) {
+      calendarTimeForm.addEventListener("submit", handleCalendarTimeSubmit);
+    }
+
+    if (calendarClearTimeButton) {
+      calendarClearTimeButton.addEventListener("click", clearCalendarItemTime);
+    }
+
     if (calendarGrid) {
       calendarGrid.addEventListener("click", handleCalendarGridClick);
     }
@@ -478,6 +489,9 @@ function assignElements() {
   calendarPrevButton = document.querySelector(".calendar-prev-button");
   calendarNextButton = document.querySelector(".calendar-next-button");
   calendarCloseButton = document.querySelector(".calendar-close-button");
+  calendarTimeForm = document.querySelector(".calendar-time-form");
+  calendarTimeInput = document.querySelector(".calendar-time-input");
+  calendarClearTimeButton = document.querySelector(".calendar-clear-time-button");
   list = document.querySelector(".list");
   topButton = document.querySelector(".top-button");
   debugPanel = document.querySelector(".debug-panel");
@@ -1708,6 +1722,7 @@ function openCalendarDialog(item) {
   calendarYear = date.getFullYear();
   calendarMonth = date.getMonth();
   calendarModal.hidden = false;
+  renderCalendarTimeInput(item);
   renderCalendar();
   lockPageScroll();
   calendarCloseButton.focus();
@@ -1715,6 +1730,10 @@ function openCalendarDialog(item) {
 
 function closeCalendarDialog() {
   if (!calendarModal) {
+    return;
+  }
+
+  if (applyCalendarTimeInput() === "invalid") {
     return;
   }
 
@@ -1809,7 +1828,90 @@ function selectCalendarDate(dateValue) {
   updateItem(updatedItem);
   renderEditDialogItem(updatedItem);
   refreshSearchDialog();
-  closeCalendarDialog();
+  renderCalendar();
+  playSavedSound();
+  showStatus("Изменено");
+  clearPhraseSoon();
+}
+
+function renderCalendarTimeInput(item) {
+  if (!calendarTimeInput) {
+    return;
+  }
+
+  calendarTimeInput.value = item.time || item.period || "";
+}
+
+function handleCalendarTimeSubmit(event) {
+  event.preventDefault();
+  applyCalendarTimeInput({ announce: true });
+}
+
+function applyCalendarTimeInput(options = {}) {
+  if (!calendarTimeInput || !calendarItemId) {
+    return false;
+  }
+
+  const value = normalize(calendarTimeInput.value);
+
+  if (!value) {
+    return false;
+  }
+
+  const item = items.find((currentItem) => currentItem.id === calendarItemId);
+
+  if (!item) {
+    return false;
+  }
+
+  const parsedTime = parseTime(value, { preferWrittenTime: true });
+  const parsedPeriod = parsedTime ? "" : parseDayPeriod(value);
+
+  if (!parsedTime && !parsedPeriod) {
+    showStatus("Не получилось разобрать время");
+    return "invalid";
+  }
+
+  const updatedItem = {
+    ...item,
+    time: parsedTime || "",
+    period: parsedTime ? "" : parsedPeriod,
+  };
+
+  updateItem(updatedItem);
+  renderEditDialogItem(updatedItem);
+  refreshSearchDialog();
+  renderCalendarTimeInput(updatedItem);
+
+  if (options.announce) {
+    playSavedSound();
+    showStatus("Изменено");
+    clearPhraseSoon();
+  }
+
+  return true;
+}
+
+function clearCalendarItemTime() {
+  const item = items.find((currentItem) => currentItem.id === calendarItemId);
+
+  if (!item) {
+    return;
+  }
+
+  const updatedItem = {
+    ...item,
+    time: "",
+    period: "",
+  };
+
+  updateItem(updatedItem);
+  renderEditDialogItem(updatedItem);
+  refreshSearchDialog();
+  renderCalendarTimeInput(updatedItem);
+  playSavedSound();
+  showStatus("Изменено");
+  clearPhraseSoon();
 }
 
 function getRenamedItem(item, phrase) {

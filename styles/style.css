@@ -642,6 +642,49 @@ h1 {
   border-color: var(--color-primary);
 }
 
+.calendar-time-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.calendar-time-label {
+  color: var(--color-muted);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.calendar-time-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.calendar-time-input {
+  min-inline-size: 0;
+  min-block-size: 42px;
+  padding: 8px 10px;
+  border: 2px solid var(--color-border-strong);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+  font-size: 16px;
+}
+
+.calendar-clear-time-button {
+  min-block-size: 42px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--color-muted);
+  background: var(--color-control);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .calendar-close-button {
   inline-size: 100%;
   min-block-size: 42px;

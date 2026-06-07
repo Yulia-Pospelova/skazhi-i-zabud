@@ -167,8 +167,25 @@
             <span>вс</span>
           </div>
           <div class="calendar-grid"></div>
+          <form class="calendar-time-form">
+            <label class="calendar-time-label" for="calendar-time-input">
+              время
+            </label>
+            <div class="calendar-time-row">
+              <input
+                class="calendar-time-input"
+                id="calendar-time-input"
+                type="text"
+                autocomplete="off"
+                placeholder="не менять"
+              />
+              <button class="calendar-clear-time-button" type="button">
+                без времени
+              </button>
+            </div>
+          </form>
           <button class="calendar-close-button" type="button">
-            закрыть
+            ок
           </button>
         </div>
       </div>
