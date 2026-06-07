@@ -1839,7 +1839,7 @@ function renderCalendarTimeInput(item) {
     return;
   }
 
-  calendarTimeInput.value = item.time || item.period || "";
+  calendarTimeInput.value = item.time || "";
 }
 
 function handleCalendarTimeSubmit(event) {
@@ -1864,18 +1864,15 @@ function applyCalendarTimeInput(options = {}) {
     return false;
   }
 
-  const parsedTime = parseTime(value, { preferWrittenTime: true });
-  const parsedPeriod = parsedTime ? "" : parseDayPeriod(value);
-
-  if (!parsedTime && !parsedPeriod) {
+  if (!isValidAITime(value)) {
     showStatus("Не получилось разобрать время");
     return "invalid";
   }
 
   const updatedItem = {
     ...item,
-    time: parsedTime || "",
-    period: parsedTime ? "" : parsedPeriod,
+    time: value,
+    period: "",
   };
 
   updateItem(updatedItem);
