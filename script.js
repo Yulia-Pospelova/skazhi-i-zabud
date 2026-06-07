@@ -37,6 +37,7 @@ const AI_DEBUG_STORAGE_KEY = "expiry-reminders-ai-debug";
 // После публикации Cloudflare Worker вставить сюда его адрес.
 const AI_PROXY_URL = "https://skazhi-ai-parser.muha2308.workers.dev";
 const AI_REQUEST_TIMEOUT_MS = 3500;
+const AI_MIN_NAME_LENGTH = 2;
 const DEBUG_MODE = new URLSearchParams(window.location.search).has("debug");
 const MESSAGE_VISIBLE_MS = 4000;
 const SHORT_MESSAGE_VISIBLE_MS = 2200;
@@ -53,6 +54,16 @@ const reminderRules = [
   { days: 7, label: "за неделю" },
   { days: 1, label: "за день" },
 ];
+const suspiciousAINames = new Set([
+  "предмет",
+  "напоминание",
+  "событие",
+  "дело",
+  "задача",
+  "что-то",
+  "что то",
+  "хабиб",
+]);
 const monthNames = [
   "января",
   "февраля",
@@ -1380,18 +1391,40 @@ function createItemFromAIData(data, source) {
   const time = getAINullableString(data.time || data["время"]);
   const period = getAINullableString(data.period || data["часть_дня"]);
   const displayDate = getAINullableString(data.displayDate || data["текст_даты"]);
+  const parsedName = getParsedName(name);
 
   if (!name || !isValidAIISODate(date) || !isValidAITime(time)) {
+    logAIProblem("invalid-data", {
+      phrase: normalizeInputForAI(source),
+      name,
+      date,
+      time,
+    });
     return null;
   }
 
   if (period && !["утром", "днем", "днём", "вечером", "ночью"].includes(period)) {
+    logAIProblem("invalid-period", {
+      phrase: normalizeInputForAI(source),
+      period,
+    });
+    return null;
+  }
+
+  if (!isReliableAIItem({ name: parsedName, date, time, period, source })) {
+    logAIProblem("low-confidence", {
+      phrase: normalizeInputForAI(source),
+      name: parsedName,
+      date,
+      time,
+      period,
+    });
     return null;
   }
 
   return {
     id: createId(),
-    name: getParsedName(name),
+    name: parsedName,
     date,
     time,
     period: time ? "" : (period || ""),
@@ -1436,6 +1469,55 @@ function isValidAITime(value) {
 
   const [hour, minute] = value.split(":").map(Number);
   return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
+}
+
+function isReliableAIItem(item) {
+  const name = normalize(item.name || "");
+  const source = normalize(normalizeInputForAI(item.source || ""));
+
+  if (!name || name.length < AI_MIN_NAME_LENGTH || suspiciousAINames.has(name)) {
+    return false;
+  }
+
+  if (!hasDateSignal(source)) {
+    return false;
+  }
+
+  if (!isAIDateInReasonableRange(item.date)) {
+    return false;
+  }
+
+  if (!doesNameComeFromSource(name, source)) {
+    return false;
+  }
+
+  return true;
+}
+
+function hasDateSignal(source) {
+  return /\b(сегодня|завтра|послезавтра|через|до|следующ(?:ий|ая|ее|ем|его)|понедельник|вторник|сред[ау]|четверг|пятниц[ау]|суббот[ау]|воскресенье|январ[ьяе]|феврал[ьяе]|март[ае]?|апрел[ьяе]|ма[йяе]|июн[ьяе]|июл[ьяе]|август[ае]?|сентябр[ьяе]|октябр[ьяе]|ноябр[ьяе]|декабр[ьяе])\b/.test(source) ||
+    /\d/.test(source);
+}
+
+function isAIDateInReasonableRange(value) {
+  const date = parseIsoDate(value);
+  const minDate = startOfToday();
+  const maxDate = startOfToday();
+  maxDate.setFullYear(maxDate.getFullYear() + 20);
+
+  return date >= minDate && date <= maxDate;
+}
+
+function doesNameComeFromSource(name, source) {
+  const nameWords = name
+    .split(" ")
+    .filter((word) => word.length >= AI_MIN_NAME_LENGTH);
+
+  if (!nameWords.length) {
+    return false;
+  }
+
+  return nameWords.some((word) => source.includes(word));
 }
 
 function handleEditPhrase(value) {
