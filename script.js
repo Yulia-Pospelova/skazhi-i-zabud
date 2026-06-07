@@ -31,6 +31,8 @@ let list = null;
 let topButton = null;
 
 const STORAGE_KEY = "expiry-reminders";
+// После публикации Cloudflare Worker вставить сюда его адрес.
+const AI_PROXY_URL = "https://skazhi-ai-parser.muha2308.workers.dev";
 const MESSAGE_VISIBLE_MS = 4000;
 const SHORT_MESSAGE_VISIBLE_MS = 2200;
 const SINGLE_CLICK_DELAY_MS = 420;
@@ -1174,7 +1176,7 @@ function getDialogFocusableElements(dialogRoot) {
   return Array.from(dialogRoot.querySelectorAll("button, [href], input, textarea, select, [tabindex]:not([tabindex='-1'])"));
 }
 
-function handleManualSubmit(event) {
+async function handleManualSubmit(event) {
   event.preventDefault();
 
   const value = normalizeManualInput(manualInput.value);
@@ -1183,7 +1185,7 @@ function handleManualSubmit(event) {
     return;
   }
 
-  const result = handlePhrase(value, { preferWrittenTime: true });
+  const result = await handlePhrase(value, { preferWrittenTime: true });
 
   if (result !== false) {
     manualInput.value = "";
@@ -1199,8 +1201,9 @@ function normalizeManualInput(value) {
     .trim();
 }
 
-function handlePhrase(value, options = {}) {
-  const parsed = parsePhrase(value, options);
+async function handlePhrase(value, options = {}) {
+  const aiParsed = await parsePhraseWithAI(value);
+  const parsed = aiParsed || parsePhrase(value, options);
 
   if (!parsed || parsed.name === "предмет") {
     if (options.fromSpeech) {
@@ -1235,6 +1238,101 @@ function handlePhrase(value, options = {}) {
   clearPhraseSoon();
   scheduleItemNotifications(parsed);
   return { type: "create", item: parsed };
+}
+
+async function parsePhraseWithAI(value) {
+  if (!AI_PROXY_URL) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(AI_PROXY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: value,
+        now: new Date().toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return createItemFromAIData(data, value);
+  } catch (error) {
+    return null;
+  }
+}
+
+function createItemFromAIData(data, source) {
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+
+  const name = getAIString(data.name || data["название"]);
+  const date = getAIString(data.date || data["дата"]);
+  const time = getAINullableString(data.time || data["время"]);
+  const period = getAINullableString(data.period || data["часть_дня"]);
+  const displayDate = getAINullableString(data.displayDate || data["текст_даты"]);
+
+  if (!name || !isValidAIISODate(date) || !isValidAITime(time)) {
+    return null;
+  }
+
+  if (period && !["утром", "днем", "днём", "вечером", "ночью"].includes(period)) {
+    return null;
+  }
+
+  return {
+    id: createId(),
+    name: getParsedName(name),
+    date,
+    time,
+    period: time ? "" : (period || ""),
+    displayDate: displayDate || "",
+    source: source.trim(),
+  };
+}
+
+function getAIString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function getAINullableString(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+
+  return getAIString(value);
+}
+
+function isValidAIISODate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+
+  return date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day;
+}
+
+function isValidAITime(value) {
+  if (!value) {
+    return true;
+  }
+
+  if (!/^\d{2}:\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [hour, minute] = value.split(":").map(Number);
+  return hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
 }
 
 function handleEditPhrase(value) {
@@ -2836,7 +2934,7 @@ function setupSpeech() {
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
 
-  recognition.addEventListener("result", (event) => {
+  recognition.addEventListener("result", async (event) => {
     const phrase = getFinalPhraseFromResult(event);
 
     if (!phrase) {
@@ -2847,7 +2945,7 @@ function setupSpeech() {
       ? handleSearchPhrase(phrase)
       : editingItemId
         ? handleEditPhrase(phrase)
-        : handlePhrase(phrase, { fromSpeech: true });
+        : await handlePhrase(phrase, { fromSpeech: true });
 
     if (result !== false && result !== "silent") {
       const displayedPhrase = getRecognizedPhraseText(phrase, result);
