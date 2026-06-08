@@ -1298,8 +1298,11 @@ function normalizeManualInput(value) {
 }
 
 async function handlePhrase(value, options = {}) {
-  const aiParsed = await parsePhraseWithAI(value);
-  const parsed = aiParsed || parsePhrase(value, options);
+  const localParsed = shouldPreferLocalParser(value)
+    ? parsePhrase(value, options)
+    : null;
+  const aiParsed = localParsed ? null : await parsePhraseWithAI(value);
+  const parsed = localParsed || aiParsed || parsePhrase(value, options);
 
   if (!parsed || parsed.name === "предмет") {
     if (options.fromSpeech) {
@@ -1336,6 +1339,12 @@ async function handlePhrase(value, options = {}) {
   return { type: "create", item: parsed };
 }
 
+function shouldPreferLocalParser(value) {
+  const phrase = normalize(value);
+
+  return /\bчерез\s+(?:пол\s+)?(?:минуту|час|(?:\d+|одну|один|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|пару)\s+(?:минуту|минуты|минут|час|часа|часов))\b/.test(phrase);
+}
+
 async function parsePhraseWithAI(value) {
   if (!AI_PROXY_URL) {
     return null;
@@ -1355,6 +1364,7 @@ async function parsePhraseWithAI(value) {
       body: JSON.stringify({
         text: normalizedValue,
         now: new Date().toISOString(),
+        localNow: formatLocalDateTimeForAI(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       }),
     });
@@ -1400,6 +1410,7 @@ async function parseSearchWithAI(value) {
         mode: "search",
         text: normalizedValue,
         now: new Date().toISOString(),
+        localNow: formatLocalDateTimeForAI(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       }),
     });
@@ -1455,6 +1466,18 @@ function normalizeInputForAI(value) {
     .replace(/(\d)([а-яё])/gi, "$1 $2")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function formatLocalDateTimeForAI() {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  const second = String(date.getSeconds()).padStart(2, "0");
+
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
 }
 
 function logAIProblem(reason, details = {}) {
@@ -3379,6 +3402,50 @@ function getFinalPhraseFromResult(event) {
   return phrase.trim();
 }
 
+function splitSeriesPhrase(value) {
+  const phrase = normalizeInputForAI(value);
+  const markerPattern = "(?:через\\s+(?:минуту|час|полчаса|пол\\s+часа|(?:\\d+|одну|один|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|пару)\\s+(?:минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев))|(?:до\\s+)?(?:сегодня|завтра|послезавтра))";
+  const markerRegex = new RegExp(markerPattern, "gi");
+  const markers = Array.from(phrase.matchAll(markerRegex));
+
+  if (markers.length < 2) {
+    return [value];
+  }
+
+  const chunks = [];
+  let chunkStart = 0;
+
+  markers.forEach((match, index) => {
+    const markerEnd = match.index + match[0].length;
+    const nextMarker = markers[index + 1];
+
+    if (!nextMarker) {
+      chunks.push(phrase.slice(chunkStart).trim());
+      return;
+    }
+
+    const between = phrase.slice(markerEnd, nextMarker.index).trim();
+
+    if (!between) {
+      return;
+    }
+
+    const nextNameMatch = between.match(/[а-яёa-z0-9][а-яёa-z0-9\s-]*$/i);
+
+    if (!nextNameMatch) {
+      return;
+    }
+
+    const nextChunkStart = markerEnd + between.lastIndexOf(nextNameMatch[0]);
+    chunks.push(phrase.slice(chunkStart, nextChunkStart).trim());
+    chunkStart = nextChunkStart;
+  });
+
+  const cleanChunks = chunks.filter(Boolean);
+
+  return cleanChunks.length > 1 ? cleanChunks : [value];
+}
+
 function setupSpeech() {
   const SpeechRecognition =
     window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -3401,6 +3468,25 @@ function setupSpeech() {
 
     if (!phrase) {
       return;
+    }
+
+    if (isSeriesActive && !isSearchActive && !editingItemId) {
+      const phrases = splitSeriesPhrase(phrase);
+
+      if (phrases.length > 1) {
+        for (const currentPhrase of phrases) {
+          const result = await handlePhrase(currentPhrase, { fromSpeech: true });
+
+          if (result !== false && result !== "silent") {
+            const displayedPhrase = getRecognizedPhraseText(currentPhrase, result);
+            showRecognizedPhrase(displayedPhrase);
+            announceToScreenReader(`распознано: ${displayedPhrase}`);
+          }
+        }
+
+        resetSeriesSilenceTimer();
+        return;
+      }
     }
 
     const result = isSearchActive

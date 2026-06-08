@@ -14,15 +14,15 @@ export default {
     }
 
     try {
-      const { text, now, timezone, mode } = await request.json();
+      const { text, now, localNow, timezone, mode } = await request.json();
 
       if (!text || typeof text !== "string") {
         return jsonResponse({ error: "Text is required" }, 400, corsHeaders);
       }
 
       const systemPrompt = mode === "search"
-        ? getSearchSystemPrompt(now, timezone)
-        : getReminderSystemPrompt(now, timezone);
+        ? getSearchSystemPrompt(now, localNow, timezone)
+        : getReminderSystemPrompt(now, localNow, timezone);
 
       const aiResponse = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -79,13 +79,15 @@ export default {
   },
 };
 
-function getReminderSystemPrompt(now, timezone) {
+function getReminderSystemPrompt(now, localNow, timezone) {
   return [
         "Ты разбираешь русские напоминания для приложения 'скажи и забудь'.",
         "Пользователь говорит или пишет одну фразу для создания нового напоминания.",
         "Не обрабатывай поиск, удаление, очистку списка и изменение существующей записи.",
-        `Текущие дата и время: ${now}`,
+        `Текущее локальное время пользователя: ${localNow}`,
+        `UTC-время только для справки, не считай от него относительные сроки: ${now}`,
         `Часовой пояс пользователя: ${timezone}`,
+        "Все относительные сроки 'через N минут/часов/дней' считай строго от локального времени пользователя.",
         "",
         "Верни только JSON без markdown и без пояснений.",
         "Формат:",
@@ -154,12 +156,14 @@ function getReminderSystemPrompt(now, timezone) {
   ].join("\n");
 }
 
-function getSearchSystemPrompt(now, timezone) {
+function getSearchSystemPrompt(now, localNow, timezone) {
   return [
     "Ты разбираешь русские поисковые запросы для приложения напоминаний 'скажи и забудь'.",
     "Пользователь хочет найти уже сохраненные напоминания, а не создать новое.",
-    `Текущие дата и время: ${now}`,
+    `Текущее локальное время пользователя: ${localNow}`,
+    `UTC-время только для справки, не считай от него относительные сроки: ${now}`,
     `Часовой пояс пользователя: ${timezone}`,
+    "Все относительные даты и периоды считай строго от локального времени пользователя.",
     "",
     "Верни только JSON без markdown и без пояснений.",
     "Если запрос не похож на поиск, верни null.",
