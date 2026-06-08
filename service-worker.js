@@ -1,4 +1,4 @@
-const CACHE_NAME = "skazhi-i-zabud-v3";
+const CACHE_NAME = "skazhi-i-zabud-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -8,6 +8,9 @@ const APP_SHELL = [
   "./styles/variables.css",
   "./styles/globals.css",
   "./styles/style.css",
+  "./styles/vosk-test.css",
+  "./vosk-test.html",
+  "./vosk-test.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon.svg",

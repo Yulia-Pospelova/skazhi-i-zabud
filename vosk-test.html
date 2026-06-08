@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#167348" />
+    <title>тест vosk</title>
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./fonts/fonts.css" />
+    <link rel="stylesheet" href="./styles/variables.css" />
+    <link rel="stylesheet" href="./styles/globals.css" />
+    <link rel="stylesheet" href="./styles/vosk-test.css" />
+    <script src="https://cdn.jsdelivr.net/npm/vosk-browser@0.0.5/dist/vosk.js"></script>
+    <script src="./vosk-test.js" defer></script>
+  </head>
+  <body class="vosk-page">
+    <main class="vosk-app">
+      <h1>тест vosk</h1>
+
+      <section class="vosk-panel" aria-label="проверка распознавания">
+        <label class="vosk-label" for="model-url">модель</label>
+        <input
+          class="vosk-input"
+          id="model-url"
+          type="url"
+          value="./model.tar.gz"
+          autocomplete="off"
+        />
+        <p class="vosk-note">для проверки нужен файл модели в формате tar.gz</p>
+
+        <button class="vosk-load-button" type="button">
+          загрузить модель
+        </button>
+
+        <p class="vosk-status" aria-live="polite">модель не загружена</p>
+
+        <button class="vosk-start-button" type="button" disabled>
+          старт
+        </button>
+
+        <p class="vosk-partial" aria-live="polite">...</p>
+      </section>
+
+      <section class="vosk-results" aria-label="результаты">
+        <h2>что услышано</h2>
+        <ol class="vosk-list"></ol>
+      </section>
+    </main>
+  </body>
+</html>
