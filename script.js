@@ -2010,8 +2010,20 @@ function getCorrectedItem(item, value) {
   }
 
   if (commandType === "time") {
+    const relativeTime = getRelativeCorrectionTime(cleanedValue);
     const period = parseDayPeriod(cleanedValue);
     const time = parseCorrectionTime(cleanedValue);
+
+    if (relativeTime) {
+      return {
+        ...item,
+        date: relativeTime.date,
+        time: relativeTime.time,
+        period: "",
+        displayDate: "",
+        source: value.trim(),
+      };
+    }
 
     if (period) {
       return {
@@ -2056,6 +2068,19 @@ function getCorrectedItem(item, value) {
   }
 
   return null;
+}
+
+function getRelativeCorrectionTime(value) {
+  const relative = parseRelativeDate(`напоминание ${value}`);
+
+  if (!relative || !["minute", "hour"].includes(relative.unit)) {
+    return null;
+  }
+
+  return {
+    date: toIsoDate(relative.date),
+    time: getTimeFromRelative(relative),
+  };
 }
 
 function isCorrectionCommand(value) {
