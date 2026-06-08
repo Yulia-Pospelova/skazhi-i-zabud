@@ -1,5 +1,6 @@
 const modelInput = document.querySelector("#model-url");
 const loadButton = document.querySelector(".vosk-load-button");
+const cancelButton = document.querySelector(".vosk-cancel-button");
 const startButton = document.querySelector(".vosk-start-button");
 const statusText = document.querySelector(".vosk-status");
 const partialText = document.querySelector(".vosk-partial");
@@ -11,8 +12,11 @@ let mediaStream = null;
 let audioContext = null;
 let processor = null;
 let isListening = false;
+let loadStartedAt = 0;
+let loadTimer = null;
 
 loadButton.addEventListener("click", loadModel);
+cancelButton.addEventListener("click", cancelModelLoading);
 startButton.addEventListener("click", toggleListening);
 
 async function loadModel() {
@@ -29,11 +33,13 @@ async function loadModel() {
   }
 
   loadButton.disabled = true;
+  cancelButton.hidden = false;
   startButton.disabled = true;
-  setStatus("загружаю модель");
+  startLoadTimer();
 
   try {
     model = await Vosk.createModel(modelUrl);
+    stopLoadTimer();
     recognizer = new model.KaldiRecognizer(16000);
     recognizer.setWords(true);
 
@@ -51,11 +57,43 @@ async function loadModel() {
 
     setStatus("модель загружена");
     startButton.disabled = false;
+    loadButton.disabled = false;
+    cancelButton.hidden = true;
   } catch (error) {
+    stopLoadTimer();
     console.error(error);
     setStatus("модель не загрузилась");
     loadButton.disabled = false;
+    cancelButton.hidden = true;
   }
+}
+
+function startLoadTimer() {
+  loadStartedAt = Date.now();
+  updateLoadStatus();
+  clearInterval(loadTimer);
+  loadTimer = setInterval(updateLoadStatus, 5000);
+}
+
+function stopLoadTimer() {
+  clearInterval(loadTimer);
+  loadTimer = null;
+}
+
+function updateLoadStatus() {
+  const seconds = Math.round((Date.now() - loadStartedAt) / 1000);
+
+  if (seconds >= 120) {
+    setStatus(`загружаю ${seconds} секунд. если дальше не меняется, телефон или браузер может не тянуть модель`);
+    return;
+  }
+
+  setStatus(`загружаю модель, ${seconds} секунд`);
+}
+
+function cancelModelLoading() {
+  stopListening();
+  window.location.reload();
 }
 
 async function toggleListening() {

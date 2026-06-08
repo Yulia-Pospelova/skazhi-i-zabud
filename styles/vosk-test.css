@@ -67,6 +67,7 @@
 }
 
 .vosk-load-button,
+.vosk-cancel-button,
 .vosk-start-button {
   inline-size: 100%;
   min-block-size: 52px;
@@ -81,12 +82,22 @@
   cursor: pointer;
 }
 
+.vosk-cancel-button {
+  color: var(--color-muted);
+  background: var(--color-control);
+}
+
+.vosk-cancel-button[hidden] {
+  display: none;
+}
+
 .vosk-start-button {
   min-block-size: 132px;
   font-size: 32px;
 }
 
 .vosk-load-button:disabled,
+.vosk-cancel-button:disabled,
 .vosk-start-button:disabled {
   color: var(--color-muted);
   background: var(--color-control);
