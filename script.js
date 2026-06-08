@@ -1298,11 +1298,11 @@ function normalizeManualInput(value) {
 }
 
 async function handlePhrase(value, options = {}) {
-  const localParsed = shouldPreferLocalParser(value)
-    ? parsePhrase(value, options)
+  const localParsed = parsePhrase(value, options);
+  const aiParsed = !options.fromSpeech && !localParsed
+    ? await parsePhraseWithAI(value)
     : null;
-  const aiParsed = localParsed ? null : await parsePhraseWithAI(value);
-  const parsed = localParsed || aiParsed || parsePhrase(value, options);
+  const parsed = localParsed || aiParsed;
 
   if (!parsed || parsed.name === "предмет") {
     if (options.fromSpeech) {
@@ -1337,12 +1337,6 @@ async function handlePhrase(value, options = {}) {
   clearPhraseSoon();
   scheduleItemNotifications(parsed);
   return { type: "create", item: parsed };
-}
-
-function shouldPreferLocalParser(value) {
-  const phrase = normalize(value);
-
-  return /\bчерез\s+(?:пол\s+)?(?:минуту|час|(?:\d+|одну|один|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|пару)\s+(?:минуту|минуты|минут|час|часа|часов))\b/.test(phrase);
 }
 
 async function parsePhraseWithAI(value) {
