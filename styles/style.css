@@ -1001,3 +1001,72 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* #8 плавность кнопок и появление окон */
+button {
+  transition: transform 0.08s ease, background-color 0.15s ease,
+    opacity 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:active {
+  transform: scale(0.96);
+}
+
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.search-dialog,
+.edit-dialog,
+.calendar-dialog,
+.examples-dialog {
+  animation: modal-fade-in 0.2s ease;
+}
+
+.examples-subtitle {
+  margin: 10px 0 2px;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button,
+  .search-dialog,
+  .edit-dialog,
+  .calendar-dialog,
+  .examples-dialog {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* убрать синюю подсветку/обводку при нажатии на кнопки */
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus {
+  outline: none;
+}
+
+
+.edit-save-hint {
+  font-size: 16px;
+  color: var(--color-muted);
+}
+
+/* айфон: заголовок изменения и крестик в одну строку */
+.edit-dialog-head {
+  flex-wrap: nowrap;
+}
+
+.edit-dialog-head .edit-close-button {
+  flex: 0 0 auto;
+}

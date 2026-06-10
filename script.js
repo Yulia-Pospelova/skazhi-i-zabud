@@ -23,6 +23,8 @@ let editManualPreview = null;
 let manualDateDisplay = null;
 let calendarToggleButton = null;
 let calendarWrap = null;
+let calendarModal = null;
+let calendarCloseButton = null;
 let editManualConfirmButton = null;
 let manualSearchMode = false;
 let manualPlaceholder = null;
@@ -428,6 +430,13 @@ function initApp() {
     // не мешал подключить кнопки и ручной ввод ниже.
     try { setupSpeech(); } catch (error) { console.warn("setupSpeech failed", error); }
     try { scheduleAllNotifications(); } catch (error) { console.warn("notif failed", error); }
+    try {
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission()
+          .then(() => { try { scheduleAllNotifications(); } catch (error) {} })
+          .catch(() => {});
+      }
+    } catch (error) {}
     try { startExpiryTicker(); } catch (error) { console.warn("ticker failed", error); }
     try { registerServiceWorker(); } catch (error) { console.warn("sw failed", error); }
     try { setupDebugPanel(); } catch (error) { console.warn("debug failed", error); }
@@ -525,8 +534,14 @@ function initApp() {
 
     if (calendarToggleButton) {
       calendarToggleButton.addEventListener("click", () => {
-        if (calendarWrap) {
-          calendarWrap.hidden = !calendarWrap.hidden;
+        openCalendarDialog();
+      });
+    }
+
+    if (calendarModal) {
+      calendarModal.addEventListener("click", (event) => {
+        if (event.target === calendarModal) {
+          closeCalendarDialog();
         }
       });
     }
@@ -651,13 +666,15 @@ function assignElements() {
   searchCloseButton = document.querySelector(".search-close-button");
   searchOkButton = document.querySelector(".search-ok-button");
   editModal = document.querySelector(".edit-modal");
-  editCard = document.querySelector(".edit-card");
+  editCard = document.querySelector(".edit-card-host");
   editPreviewCard = document.querySelector(".edit-preview-card");
   editManualCard = document.querySelector(".edit-manual-card");
   editManualPreview = document.querySelector(".edit-manual-preview");
   manualDateDisplay = document.querySelector(".manual-date-display");
   calendarToggleButton = document.querySelector(".calendar-toggle-button");
   calendarWrap = document.querySelector(".calendar-wrap");
+  calendarModal = document.querySelector(".calendar-modal");
+  calendarCloseButton = document.querySelector(".calendar-close-button");
   editManualConfirmButton = document.querySelector(".edit-manual-confirm-button");
   editOkButton = document.querySelector(".edit-close-button");
   editVoiceButton = document.querySelector(".edit-voice-button");
@@ -936,6 +953,12 @@ function findItemsBySearchQuery(query) {
     return findItemsByDate(searchWeekday);
   }
 
+  const searchPeriod = parseSearchPeriod(query);
+
+  if (searchPeriod) {
+    return findItemsByDateRange(searchPeriod.startDate, searchPeriod.endDate);
+  }
+
   const searchDate = parseSearchDate(query);
 
   if (searchDate) {
@@ -1081,6 +1104,68 @@ function parseSearchWeek(query) {
   endDate.setDate(endDate.getDate() + 6);
 
   return { startDate, endDate };
+}
+
+function makePeriodRange(months, days) {
+  const startDate = startOfToday();
+  const endDate = startOfToday();
+  if (months) {
+    endDate.setMonth(endDate.getMonth() + months);
+  }
+  if (days) {
+    endDate.setDate(endDate.getDate() + days);
+  }
+  return { startDate, endDate };
+}
+
+function parseSearchPeriod(query) {
+  const phrase = normalizeSearchPhrase(query);
+
+  if (/^пол\s?года$/.test(phrase)) {
+    return makePeriodRange(6, 0);
+  }
+
+  if (/^полтора\s+месяца$/.test(phrase)) {
+    return makePeriodRange(1, 15);
+  }
+
+  const match = phrase.match(/^(?:за\s+|на\s+|в\s+течение\s+|через\s+)?(\d+|один|одна|одну|одно|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|пол)?\s*(год|года|лет|месяц|месяца|месяцев|недел[яюиь]|дн[яя]|дня|день|дней)$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const word = match[2];
+  let amount = 1;
+
+  if (match[1] === "пол") {
+    if (/год|года|лет/.test(word)) {
+      return makePeriodRange(6, 0);
+    }
+    if (/месяц/.test(word)) {
+      return makePeriodRange(0, 15);
+    }
+  } else if (match[1]) {
+    amount = /^\d+$/.test(match[1]) ? parseInt(match[1], 10) : getSearchAmount(match[1]);
+  }
+
+  if (!amount || amount < 1) {
+    amount = 1;
+  }
+
+  if (/год|года|лет/.test(word)) {
+    return makePeriodRange(amount * 12, 0);
+  }
+
+  if (/месяц/.test(word)) {
+    return makePeriodRange(amount, 0);
+  }
+
+  if (/недел/.test(word)) {
+    return makePeriodRange(0, amount * 7);
+  }
+
+  return makePeriodRange(0, amount);
 }
 
 function getStartOfWeek(date) {
@@ -1967,17 +2052,19 @@ function refreshAfterEditModalUpdate(updatedItem) {
   refreshSearchDialog();
 }
 
+function openCalendarDialog() {
+  if (!calendarModal) {
+    return;
+  }
+  renderCalendar();
+  calendarModal.hidden = false;
+}
+
 function closeCalendarDialog() {
-  if (!editManualPanel) {
+  if (!calendarModal) {
     return;
   }
-
-  if (applyCalendarTimeInput() === "invalid") {
-    return;
-  }
-
-  editManualPanel.hidden = true;
-  calendarItemId = null;
+  calendarModal.hidden = true;
 }
 
 function isCalendarDialogOpen() {
@@ -2060,6 +2147,7 @@ function selectCalendarDate(dateValue) {
   updateManualDateDisplay();
   renderCalendar();
   playSavedSound();
+  closeCalendarDialog();
 }
 
 function populateTimeSelects() {
@@ -2606,8 +2694,8 @@ function showManualEditPanel() {
     editNameInput.value = "";
     editNameInput.placeholder = "название";
   }
-  if (calendarWrap) {
-    calendarWrap.hidden = true;
+  if (calendarModal) {
+    calendarModal.hidden = true;
   }
   renderCalendarTimeInput(base);
   renderCalendar();
@@ -2709,6 +2797,9 @@ function showSaveConfirm() {
     editHasChanges = false;
     pendingEditItem = null;
     closeEditDialog();
+    if (isSearchDialogOpen()) {
+      closeSearchDialog();
+    }
   }, { yesLabel: "сохранить", noLabel: "отмена", yesColor: "var(--color-primary)" });
 }
 
@@ -2738,6 +2829,9 @@ function closeEditDialog() {
   calendarItemId = null;
   if (editManualPanel) {
     editManualPanel.hidden = true;
+  }
+  if (calendarModal) {
+    calendarModal.hidden = true;
   }
   stopSeriesListening();
   items = sortByDate(items);
@@ -3005,9 +3099,13 @@ function startRecognition() {
     recognition.start();
     isRecognitionRunning = true;
   } catch (error) {
+    if (error && error.name === "InvalidStateError") {
+      // распознавание уже идёт — просто продолжаем слушать
+      isRecognitionRunning = true;
+      return;
+    }
     isRecognitionRunning = false;
     startButton.classList.remove("is-listening");
-    showStatus("Голос не запустился, обнови страницу и нажми старт еще раз");
   }
 }
 
@@ -3800,9 +3898,6 @@ function showConfirm(message, onConfirm, options = {}) {
     "background:#e2e2e2;color:#222;";
   yes.addEventListener("click", () => { overlay.remove(); onConfirm(); });
   no.addEventListener("click", () => overlay.remove());
-  overlay.addEventListener("click", (event) => {
-    if (event.target === overlay) overlay.remove();
-  });
   row.append(no, yes);
   if (options.cardNode) {
     const cardWrap = document.createElement("div");

@@ -22,9 +22,6 @@
       <section class="hero">
         <h1>скажи и забудь</h1>
         <div class="hero-actions">
-          <button class="notify-button" type="button" aria-expanded="false" aria-controls="settings-panel">
-            настроить
-          </button>
           <button
             class="examples-button"
             type="button"
@@ -35,21 +32,6 @@
           </button>
         </div>
 
-        <div class="settings" id="settings-panel" role="group" aria-label="настройки" style="display:none;flex-direction:column;gap:10px;align-items:flex-start;margin-top:12px;font-size:15px;">
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" class="setting-notify" style="width:18px;height:18px;" />
-            уведомления
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" class="setting-sound" style="width:18px;height:18px;" />
-            звук напоминания
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-            <input type="checkbox" class="setting-popup" style="width:18px;height:18px;" />
-            всплывающее окно
-          </label>
-        </div>
-        <p class="notify-status" aria-live="polite"></p>
       </section>
 
       <section class="capture" aria-label="напоминания">
@@ -146,7 +128,7 @@
           aria-labelledby="edit-dialog-title"
         >
           <div class="edit-dialog-head">
-            <h2 id="edit-dialog-title" style="font-size:18px;white-space:nowrap;margin:0;">изменение напоминания</h2>
+            <h2 id="edit-dialog-title" style="font-size:17px;margin:0;min-inline-size:0;line-height:1.2;">изменение напоминания</h2>
             <button class="edit-close-button search-close-button" type="button" aria-label="закрыть" style="font-size:24px;color:var(--color-danger);outline:none;-webkit-tap-highlight-color:transparent;">×</button>
           </div>
           <div class="edit-mode-buttons" role="group" aria-label="способ изменения">
@@ -167,7 +149,8 @@
               <p>- добавить время</p>
               <p>- удалить время</p>
             </div>
-            <div class="edit-card" style="margin-top:16px;"></div>
+            <p class="edit-save-hint" style="margin:10px 0 0;text-align:left;">Чтобы сохранить изменения, нажми <span class="button-name">ок</span>.</p>
+            <div class="edit-card-host" style="margin-top:8px;"></div>
             <button class="edit-voice-start-button" type="button">
               старт
             </button>
@@ -179,6 +162,7 @@
           </div>
 
           <div class="edit-manual-panel" hidden>
+            <p class="edit-save-hint" style="margin:0 0 8px;text-align:left;">Чтобы сохранить изменения, нажми <span class="button-name">ок</span>.</p>
             <div class="edit-manual-card" style="margin-bottom:14px;"></div>
             <div class="calendar-name-form" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;text-align:left;">
               <input class="edit-name-input" id="edit-name-input" type="text" autocomplete="off" placeholder="название" aria-label="название" style="padding:8px 10px;font-size:16px;border-radius:10px;border:1px solid #ccc;outline:none;-webkit-tap-highlight-color:transparent;" />
@@ -186,17 +170,6 @@
             <div class="manual-date-row" style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
               <input class="manual-date-display" type="text" readonly placeholder="дата" aria-label="дата" style="flex:1;box-sizing:border-box;padding:8px 10px;font-size:16px;border-radius:10px;border:1px solid #ccc;outline:none;background:#fff;" />
               <button class="calendar-toggle-button" type="button" aria-label="открыть календарь" style="min-width:48px;min-height:46px;border:1px solid #ccc;border-radius:10px;background:#fff;font-size:20px;">📅</button>
-            </div>
-            <div class="calendar-wrap" hidden>
-              <div class="calendar-head">
-                <button class="calendar-prev-button" type="button" aria-label="предыдущий месяц">‹</button>
-                <h3 id="calendar-dialog-title">календарь</h3>
-                <button class="calendar-next-button" type="button" aria-label="следующий месяц">›</button>
-              </div>
-              <div class="calendar-weekdays" aria-hidden="true">
-                <span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span><span>сб</span><span>вс</span>
-              </div>
-              <div class="calendar-grid"></div>
             </div>
             <div class="calendar-time-block">
               <span class="calendar-time-label">время</span>
@@ -215,6 +188,20 @@
         </div>
       </div>
 
+      <div class="calendar-modal" hidden>
+        <div class="calendar-dialog" role="dialog" aria-modal="true" aria-label="календарь">
+          <div class="calendar-head">
+            <button class="calendar-prev-button" type="button" aria-label="предыдущий месяц">‹</button>
+            <h3 id="calendar-dialog-title">календарь</h3>
+            <button class="calendar-next-button" type="button" aria-label="следующий месяц">›</button>
+          </div>
+          <div class="calendar-weekdays" aria-hidden="true">
+            <span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span><span>сб</span><span>вс</span>
+          </div>
+          <div class="calendar-grid"></div>
+        </div>
+      </div>
+
       <div class="examples-modal" hidden>
         <div
           class="examples-dialog"
@@ -224,43 +211,31 @@
           aria-label="инструкция"
           tabindex="-1"
         >
-          <div class="examples-dialog-head">
-            <h2 id="examples-dialog-title">как пользоваться</h2>
+          <div class="examples-dialog-head" style="position:relative;display:flex;align-items:center;justify-content:center;">
+            <h2 id="examples-dialog-title" style="margin:0;">как пользоваться</h2>
+            <button class="examples-close-button" type="button" aria-label="закрыть" style="position:absolute;right:0;top:0;inline-size:auto;width:auto;margin:0;padding:0 12px;min-block-size:42px;font-size:24px;line-height:1;border:0;border-radius:var(--radius);background:var(--color-control);color:var(--color-danger);outline:none;-webkit-tap-highlight-color:transparent;">×</button>
           </div>
           <div class="examples-panel">
             <h3 class="examples-title">Запись напоминания</h3>
-            <p>
-              Нажми <span class="button-name">старт</span> и скажи в формате: что и когда, например:
-            </p>
+            <p class="examples-subtitle"><span class="button-name">Голосовое</span></p>
+            <p>Нажми <span class="button-name">старт</span> и скажи в формате: что и когда, например:</p>
             <div class="examples-list">
               <p>- молоко до завтра</p>
               <p>- стрижка 1 марта в 5 часов</p>
               <p>- таблетка через 30 минут</p>
               <p>- паспорт до марта следующего года</p>
             </div>
-            <div class="examples-note examples-note--plain">
-              <p>Одно напоминание: короткое нажатие.</p>
-              <p>Несколько напоминаний: нажми и подержи <span class="button-name">старт</span>, потом отпусти.</p>
-              <p>Чтобы закончить, нажми <span class="button-name">ок</span>.</p>
+            <p class="examples-subtitle"><span class="button-name">Ручное</span></p>
+            <p>Введи напоминание в поле <span class="button-name">или напиши</span> в формате: что и когда.</p>
+            <div class="examples-note">
+              <h3 class="examples-title">Поиск напоминания</h3>
+              <p>Нажми <span class="button-name">поиск</span>, скажи или напиши название напоминания или дату или период.</p>
             </div>
             <div class="examples-note">
               <h3 class="examples-title">Изменение напоминания</h3>
-              <p>Нажми <span class="button-name">изменить</span> и скажи одну из команд:</p>
-              <div class="examples-list">
-                <p>- изменить название</p>
-                <p>- изменить дату</p>
-                <p>- изменить время</p>
-                <p>- добавить время</p>
-                <p>- удалить время</p>
-              </div>
-              <p>Также изменить дату можно с помощью иконки календарь.</p>
-            </div>
-            <div class="examples-note">
-              <h3 class="examples-title">Поиск напоминания</h3>
-              <p>Нажми <span class="button-name">поиск</span> и скажи название, дату или период.</p>
+              <p>Нажми <span class="button-name">изменить</span> и выбери голосовое или ручное изменение.</p>
             </div>
           </div>
-          <button class="examples-close-button" type="button" aria-label="закрыть" style="font-size:24px;color:var(--color-danger);outline:none;-webkit-tap-highlight-color:transparent;">×</button>
         </div>
       </div>
 
