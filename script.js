@@ -7,6 +7,28 @@ let srStatus = null;
 let seriesOkButton = null;
 let notifyButton = null;
 let notifyStatus = null;
+let soundToggle = null;
+let popupToggle = null;
+let notifyToggle = null;
+let settingsPanel = null;
+let startHint = null;
+let editConfirmButton = null;
+let editVoiceActive = false;
+let editVoiceSilenceTimer = null;
+let editHasChanges = false;
+let pendingEditItem = null;
+let editPreviewCard = null;
+let editManualCard = null;
+let editManualPreview = null;
+let manualDateDisplay = null;
+let calendarToggleButton = null;
+let calendarWrap = null;
+let editManualConfirmButton = null;
+let manualSearchMode = false;
+let manualPlaceholder = null;
+let searchSilenceTimer = null;
+let manualSearchTimer = null;
+let manualIdleTimer = null;
 let examplesButton = null;
 let examplesPanel = null;
 let examplesModal = null;
@@ -32,6 +54,9 @@ let calendarPrevButton = null;
 let calendarNextButton = null;
 let calendarTimeForm = null;
 let calendarTimeInput = null;
+let editNameInput = null;
+let hourSelect = null;
+let minuteSelect = null;
 let calendarClearTimeButton = null;
 let list = null;
 let topButton = null;
@@ -41,7 +66,7 @@ let debugList = null;
 const STORAGE_KEY = "expiry-reminders";
 const AI_DEBUG_STORAGE_KEY = "expiry-reminders-ai-debug";
 // После публикации Cloudflare Worker вставить сюда его адрес.
-const AI_PROXY_URL = "https://skazhi-ai-parser.muha2308.workers.dev";
+const AI_PROXY_URL = ""; // ИИ/облако отключены: приложение использует только встроенное распознавание браузера.
 const AI_REQUEST_TIMEOUT_MS = 3500;
 const AI_MIN_NAME_LENGTH = 2;
 const DEBUG_MODE = new URLSearchParams(window.location.search).has("debug");
@@ -52,7 +77,7 @@ const LONG_PRESS_DELAY_MS = 800;
 const ERROR_SPEAK_COOLDOWN_MS = 2500;
 const ERROR_REPEAT_MESSAGE_COOLDOWN_MS = 4500;
 const SPECIFIC_ERROR_COOLDOWN_MS = 5000;
-const SERIES_SILENCE_TIMEOUT_MS = 10000;
+const SERIES_SILENCE_TIMEOUT_MS = 7000;
 const MODAL_IDLE_TIMEOUT_MS = 10000;
 const MAX_LOCAL_TIMER_MS = 2147483647;
 const reminderRules = [
@@ -310,6 +335,80 @@ let lastErrorMessage = "";
 let lastSpecificErrorAt = 0;
 let audioContext = null;
 let lastParseError = "";
+let expiryTickerId = null;
+let reminderSettings = { sound: false, popup: false };
+const SETTINGS_KEY = "skazhi-settings";
+
+function loadSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+    if (saved && typeof saved === "object") {
+      reminderSettings = {
+        sound: saved.sound === true,
+        popup: saved.popup === true,
+      };
+    }
+  } catch (error) {
+    // нет сохранённых настроек — оставляем по умолчанию (всё включено)
+  }
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(reminderSettings));
+  } catch (error) {}
+}
+
+function setupSettings() {
+  loadSettings();
+
+  if (soundToggle) {
+    soundToggle.checked = reminderSettings.sound;
+    soundToggle.addEventListener("change", () => {
+      reminderSettings.sound = soundToggle.checked;
+      saveSettings();
+    });
+  }
+
+  if (popupToggle) {
+    popupToggle.checked = reminderSettings.popup;
+    popupToggle.addEventListener("change", () => {
+      reminderSettings.popup = popupToggle.checked;
+      saveSettings();
+    });
+  }
+
+  if (notifyToggle) {
+    updateNotifyToggle();
+    notifyToggle.addEventListener("change", async () => {
+      if (notifyToggle.checked) {
+        await requestNotificationPermission();
+      } else {
+        showNotifyStatus("уведомления выключаются в настройках телефона");
+      }
+      updateNotifyToggle();
+    });
+  }
+}
+
+function updateNotifyToggle() {
+  if (!notifyToggle) {
+    return;
+  }
+  const granted = ("Notification" in window) && Notification.permission === "granted";
+  notifyToggle.checked = granted;
+}
+
+function toggleSettingsPanel() {
+  if (!settingsPanel) {
+    return;
+  }
+  const isOpen = settingsPanel.style.display !== "none";
+  settingsPanel.style.display = isOpen ? "none" : "flex";
+  if (notifyButton) {
+    notifyButton.setAttribute("aria-expanded", String(!isOpen));
+  }
+}
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initApp);
@@ -325,24 +424,25 @@ function initApp() {
     if (list) {
       renderList();
     }
-    setupSpeech();
-    scheduleAllNotifications();
-    registerServiceWorker();
-    setupDebugPanel();
+    // Каждый блок настройки защищён, чтобы сбой в одном (например, голос)
+    // не мешал подключить кнопки и ручной ввод ниже.
+    try { setupSpeech(); } catch (error) { console.warn("setupSpeech failed", error); }
+    try { scheduleAllNotifications(); } catch (error) { console.warn("notif failed", error); }
+    try { startExpiryTicker(); } catch (error) { console.warn("ticker failed", error); }
+    try { registerServiceWorker(); } catch (error) { console.warn("sw failed", error); }
+    try { setupDebugPanel(); } catch (error) { console.warn("debug failed", error); }
+    try { setupSettings(); } catch (error) { console.warn("settings failed", error); }
+    try { populateTimeSelects(); } catch (error) { console.warn("time selects failed", error); }
 
     if (startButton) {
       startButton.addEventListener("click", handleStartClick);
       startButton.addEventListener("contextmenu", (event) => {
         event.preventDefault();
       });
-      startButton.addEventListener("pointerdown", handleStartPress);
-      startButton.addEventListener("pointerup", clearStartPress);
-      startButton.addEventListener("pointerleave", clearStartPress);
-      startButton.addEventListener("pointercancel", clearStartPress);
     }
 
     if (notifyButton) {
-      notifyButton.addEventListener("click", requestNotificationPermission);
+      notifyButton.addEventListener("click", toggleSettingsPanel);
     }
 
     if (examplesButton) {
@@ -351,16 +451,11 @@ function initApp() {
 
     if (clearButton) {
       clearButton.addEventListener("click", () => {
-        const isConfirmed = window.confirm("Очистить все напоминания?");
-
-        if (!isConfirmed) {
-          return;
-        }
-
-        items = [];
-        saveItems();
-        renderList();
-        showStatus("список очищен", SHORT_MESSAGE_VISIBLE_MS);
+        showConfirm("очистить все напоминания?", () => {
+          items = [];
+          saveItems();
+          renderList();
+        });
       });
     }
 
@@ -376,6 +471,34 @@ function initApp() {
       searchButton.addEventListener("click", startSearchListening);
     }
 
+    if (manualInput) {
+      // Если идёт поиск и тапнули в поле ручного ввода — выключаем голосовой
+      // поиск; следующая отправка будет искать, а не создавать.
+      manualInput.addEventListener("focus", () => {
+        if (isSearchActive) {
+          stopSearchVoice();
+          manualSearchMode = true;
+          startManualSearchIdleTimer();
+        }
+      });
+      manualInput.addEventListener("input", () => {
+        if (manualSearchMode) {
+          startManualSearchIdleTimer();
+        } else {
+          startManualIdleTimer();
+        }
+      });
+      manualInput.addEventListener("blur", () => {
+        if (manualSearchMode && !manualInput.value.trim()) {
+          manualSearchMode = false;
+          clearTimeout(manualSearchTimer);
+          if (manualPlaceholder) {
+            manualPlaceholder.textContent = "или напиши";
+          }
+        }
+      });
+    }
+
     if (topButton) {
       topButton.addEventListener("click", scrollToAppTop);
     }
@@ -389,7 +512,23 @@ function initApp() {
     }
 
     if (editOkButton) {
-      editOkButton.addEventListener("click", closeEditDialog);
+      editOkButton.addEventListener("click", attemptCloseEdit);
+    }
+
+    if (editConfirmButton) {
+      editConfirmButton.addEventListener("click", showSaveConfirm);
+    }
+
+    if (editManualConfirmButton) {
+      editManualConfirmButton.addEventListener("click", showSaveConfirm);
+    }
+
+    if (calendarToggleButton) {
+      calendarToggleButton.addEventListener("click", () => {
+        if (calendarWrap) {
+          calendarWrap.hidden = !calendarWrap.hidden;
+        }
+      });
     }
 
     if (editVoiceButton) {
@@ -402,22 +541,6 @@ function initApp() {
 
     if (editVoiceStartButton) {
       editVoiceStartButton.addEventListener("click", startEditVoiceListening);
-    }
-
-    if (searchModal) {
-      searchModal.addEventListener("click", (event) => {
-        if (event.target === searchModal) {
-          closeSearchDialog();
-        }
-      });
-    }
-
-    if (editModal) {
-      editModal.addEventListener("click", (event) => {
-        if (event.target === editModal) {
-          closeEditDialog();
-        }
-      });
     }
 
     if (calendarPrevButton) {
@@ -446,6 +569,35 @@ function initApp() {
       calendarClearTimeButton.addEventListener("click", clearCalendarItemTime);
     }
 
+    if (hourSelect) {
+      hourSelect.addEventListener("change", () => applyCalendarTimeInput({ announce: true }));
+    }
+
+    if (minuteSelect) {
+      minuteSelect.addEventListener("change", () => applyCalendarTimeInput({ announce: true }));
+    }
+
+    if (editNameInput) {
+      editNameInput.addEventListener("change", applyEditNameInput);
+      // Подсказка «название» исчезает при нажатии и возвращается, если поле пустое.
+      editNameInput.addEventListener("focus", () => {
+        editNameInput.placeholder = "";
+      });
+      editNameInput.addEventListener("blur", () => {
+        if (!editNameInput.value) {
+          editNameInput.placeholder = "название";
+        }
+      });
+      // Enter сохраняет и остаётся в окне (не перезагружает страницу).
+      editNameInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          applyEditNameInput();
+          editNameInput.blur();
+        }
+      });
+    }
+
     if (calendarGrid) {
       calendarGrid.addEventListener("click", handleCalendarGridClick);
     }
@@ -454,15 +606,18 @@ function initApp() {
       examplesCloseButton.addEventListener("click", closeExamplesDialog);
     }
 
-    if (examplesModal) {
-      examplesModal.addEventListener("click", (event) => {
-        if (event.target === examplesModal) {
-          closeExamplesDialog();
-        }
-      });
-    }
-
     document.addEventListener("keydown", handleDocumentKeydown);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        // Свернули/закрыли приложение — закрываем диалоги, чтобы открыть на главной.
+        if (isEditDialogOpen()) {
+          closeEditDialog();
+        }
+        if (isSearchDialogOpen()) {
+          closeSearchDialog();
+        }
+      }
+    });
   } catch (error) {
     console.error("App init failed", error);
   }
@@ -470,14 +625,20 @@ function initApp() {
 
 function assignElements() {
   startButton = document.querySelector(".start-button");
+  startHint = document.querySelector(".start-hint");
   phraseInput = document.querySelector(".phrase-input");
   manualForm = document.querySelector(".manual-form");
   manualInput = document.querySelector(".manual-input");
+  manualPlaceholder = document.querySelector(".manual-input-placeholder");
   statusText = document.querySelector(".status");
   srStatus = document.querySelector(".sr-status");
   seriesOkButton = document.querySelector(".series-ok-button");
   notifyButton = document.querySelector(".notify-button");
   notifyStatus = document.querySelector(".notify-status");
+  soundToggle = document.querySelector(".setting-sound");
+  popupToggle = document.querySelector(".setting-popup");
+  notifyToggle = document.querySelector(".setting-notify");
+  settingsPanel = document.querySelector("#settings-panel");
   examplesButton = document.querySelector(".examples-button");
   examplesPanel = document.querySelector(".examples-panel");
   examplesModal = document.querySelector(".examples-modal");
@@ -491,10 +652,18 @@ function assignElements() {
   searchOkButton = document.querySelector(".search-ok-button");
   editModal = document.querySelector(".edit-modal");
   editCard = document.querySelector(".edit-card");
-  editOkButton = document.querySelector(".edit-ok-button");
+  editPreviewCard = document.querySelector(".edit-preview-card");
+  editManualCard = document.querySelector(".edit-manual-card");
+  editManualPreview = document.querySelector(".edit-manual-preview");
+  manualDateDisplay = document.querySelector(".manual-date-display");
+  calendarToggleButton = document.querySelector(".calendar-toggle-button");
+  calendarWrap = document.querySelector(".calendar-wrap");
+  editManualConfirmButton = document.querySelector(".edit-manual-confirm-button");
+  editOkButton = document.querySelector(".edit-close-button");
   editVoiceButton = document.querySelector(".edit-voice-button");
   editManualButton = document.querySelector(".edit-manual-button");
   editVoiceStartButton = document.querySelector(".edit-voice-start-button");
+  editConfirmButton = document.querySelector(".edit-confirm-button");
   editVoicePanel = document.querySelector(".edit-voice-panel");
   editManualPanel = document.querySelector(".edit-manual-panel");
   calendarTitle = document.querySelector("#calendar-dialog-title");
@@ -503,6 +672,9 @@ function assignElements() {
   calendarNextButton = document.querySelector(".calendar-next-button");
   calendarTimeForm = document.querySelector(".calendar-time-form");
   calendarTimeInput = document.querySelector(".calendar-time-input");
+  editNameInput = document.querySelector(".edit-name-input");
+  hourSelect = document.querySelector(".calendar-hour-select");
+  minuteSelect = document.querySelector(".calendar-minute-select");
   calendarClearTimeButton = document.querySelector(".calendar-clear-time-button");
   list = document.querySelector(".list");
   topButton = document.querySelector(".top-button");
@@ -515,16 +687,16 @@ function scrollToAppTop() {
   target.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function handleStartClick(event) {
+function handleStartClick() {
   unlockAudio();
-  clearTimeout(startClickTimer);
 
-  if (isLongPress) {
-    isLongPress = false;
+  // Повторное нажатие во время прослушивания работает как «стоп».
+  if (isSeriesActive) {
+    finishSeriesByButton();
     return;
   }
 
-  startClickTimer = setTimeout(startSingleListening, SINGLE_CLICK_DELAY_MS);
+  startSeriesListening();
 }
 
 function handleStartPress() {
@@ -559,6 +731,50 @@ function startSingleListening() {
   restartRecognition();
 }
 
+function stopSearchVoice() {
+  if (!isSearchActive) {
+    return;
+  }
+  isSearchActive = false;
+  clearTimeout(searchSilenceTimer);
+  shouldSkipNextRestart = true;
+  try {
+    recognition.stop();
+  } catch (error) {}
+  if (searchButton) {
+    searchButton.classList.remove("is-listening");
+  }
+  if (startButton) {
+    startButton.classList.remove("is-listening");
+  }
+  setStartButtonLabel("старт");
+}
+
+function startManualIdleTimer() {
+  clearTimeout(manualIdleTimer);
+  if (!manualInput || !manualInput.value.trim()) {
+    return;
+  }
+  manualIdleTimer = setTimeout(() => {
+    manualInput.value = "";
+    manualInput.blur();
+  }, 10000);
+}
+
+function startManualSearchIdleTimer() {
+  clearTimeout(manualSearchTimer);
+  manualSearchTimer = setTimeout(() => {
+    manualSearchMode = false;
+    if (manualInput) {
+      manualInput.value = "";
+      manualInput.blur();
+    }
+    if (manualPlaceholder) {
+      manualPlaceholder.textContent = "или напиши";
+    }
+  }, 7000);
+}
+
 function startSearchListening() {
   unlockAudio();
 
@@ -568,13 +784,24 @@ function startSearchListening() {
   }
 
   cancelEditing();
+  shouldSkipNextRestart = false;
   isSearchActive = true;
   isSeriesActive = false;
   setRecognitionContinuous(false);
   startButton.classList.add("is-listening");
-  showStatus("назови напоминание");
+  setStartButtonLabel("стоп");
+  if (manualPlaceholder) {
+    manualPlaceholder.textContent = "поиск";
+  }
+  showStatus("назови или напиши напоминание");
   lastErrorPhrase = "";
   restartRecognition();
+  // Если молчишь и не печатаешь — через 7 сек поиск тихо завершается.
+  clearTimeout(searchSilenceTimer);
+  searchSilenceTimer = setTimeout(() => {
+    stopSearchVoice();
+    cancelSearch();
+  }, 7000);
 }
 
 function openExamplesDialog() {
@@ -664,7 +891,7 @@ async function handleSearchPhrase(value) {
   cancelSearch();
 
   if (!matches.length) {
-    showStatus("не нашла такое напоминание");
+    showStatus(`не нашла: «${value}»`);
     clearPhraseSoon();
     return true;
   }
@@ -1098,7 +1325,6 @@ function showSearchDialog(matches, query) {
   updateSearchTitle(matches.length);
   lockPageScroll();
   searchCloseButton.focus();
-  showStatus(`найдено: ${matches.length}`);
   announceToScreenReader(`найдено по запросу ${query}: ${matches.length}`);
 }
 
@@ -1167,8 +1393,10 @@ function createSearchResult(item) {
   });
 
   deleteButton.addEventListener("click", () => {
-    deleteItem(item.id);
-    refreshSearchDialog();
+    showConfirm("удалить напоминание?", () => {
+      deleteItem(item.id);
+      refreshSearchDialog();
+    });
   });
 
   closeButton.addEventListener("click", () => {
@@ -1281,10 +1509,22 @@ async function handleManualSubmit(event) {
     return;
   }
 
+  // Ручной поиск: если включён режим поиска — ищем, а не создаём.
+  if (manualSearchMode) {
+    manualSearchMode = false;
+    clearTimeout(manualSearchTimer);
+    manualInput.value = "";
+    manualInput.blur();
+    handleSearchPhrase(value);
+    return;
+  }
+
   const result = await handlePhrase(value, { preferWrittenTime: true });
 
   if (result !== false) {
     manualInput.value = "";
+    manualInput.blur();
+    clearTimeout(manualIdleTimer);
   }
 }
 
@@ -1309,7 +1549,7 @@ async function handlePhrase(value, options = {}) {
       hideStatus();
       speakError(value, lastParseError);
     } else {
-      showStatus("не получилось разобрать срок. пример: молоко до 5 июня");
+      showStatus("Введите напоминание в формате что и когда");
       clearPhraseSoon();
     }
     return false;
@@ -1317,7 +1557,7 @@ async function handlePhrase(value, options = {}) {
 
   if (hasDuplicateItem(parsed)) {
     playSavedSound();
-    showStatus(isSeriesActive ? "Такая запись уже есть\nМожно сказать еще" : "Такая запись уже есть");
+    showStatus(isSeriesActive ? "Такая запись уже есть" : "Такая запись уже есть");
     clearPhraseSoon();
     return true;
   }
@@ -1331,7 +1571,7 @@ async function handlePhrase(value, options = {}) {
   playSavedSound();
   showStatus(
     isSeriesActive
-      ? `Сохранено, ${formatReminderMessage(parsed)}\nМожно сказать еще`
+      ? `Сохранено, ${formatReminderMessage(parsed)}`
       : `Сохранено, ${formatReminderMessage(parsed)}`,
   );
   clearPhraseSoon();
@@ -1691,20 +1931,22 @@ function handleEditPhrase(value) {
     return false;
   }
 
+  // Изменения копятся в черновик и НЕ применяются к верхней карточке,
+  // пока не нажмёшь «ок» -> «сохранить».
+  const base = pendingEditItem || item;
   const phrase = normalize(value);
 
-  const renamedItem = getRenamedItem(item, phrase);
+  const renamedItem = getRenamedItem(base, phrase);
 
   if (renamedItem) {
-    updateItem(renamedItem, { sortNow: false });
-    refreshAfterEditModalUpdate(renamedItem);
+    pendingEditItem = renamedItem;
+    renderEditPreviewCard(pendingEditItem);
     playSavedSound();
-    showStatus("Изменено");
-    clearPhraseSoon();
+    showStatus("записала, нажми «ок»");
     return { type: "edit", item: renamedItem };
   }
 
-  const correction = getCorrectedItem(item, value);
+  const correction = getCorrectedItem(base, value);
 
   if (!correction) {
     hideStatus();
@@ -1712,11 +1954,10 @@ function handleEditPhrase(value) {
     return false;
   }
 
-  updateItem(correction, { sortNow: false });
-  refreshAfterEditModalUpdate(correction);
+  pendingEditItem = correction;
+  renderEditPreviewCard(pendingEditItem);
   playSavedSound();
-  showStatus(`Изменено, ${formatReminderMessage(correction)}`);
-  clearPhraseSoon();
+  showStatus("записала, нажми «ок»");
   return { type: "edit", item: correction };
 }
 
@@ -1755,7 +1996,7 @@ function renderCalendar() {
     return;
   }
 
-  const item = items.find((currentItem) => currentItem.id === calendarItemId);
+  const item = pendingEditItem || items.find((currentItem) => currentItem.id === calendarItemId);
   const selectedDate = item ? parseIsoDate(item.date) : null;
   const firstDay = new Date(calendarYear, calendarMonth, 1);
   const daysInMonth = lastDayOfMonth(calendarMonth, calendarYear);
@@ -1806,34 +2047,57 @@ function handleCalendarGridClick(event) {
 }
 
 function selectCalendarDate(dateValue) {
-  const item = items.find((currentItem) => currentItem.id === calendarItemId);
+  const base = pendingEditItem || items.find((currentItem) => currentItem.id === calendarItemId);
 
-  if (!item) {
+  if (!base) {
     closeCalendarDialog();
     return;
   }
 
-  const updatedItem = {
-    ...item,
-    date: dateValue,
-    displayDate: "",
-  };
-
-  updateItem(updatedItem);
-  renderEditDialogItem(updatedItem);
-  refreshSearchDialog();
+  pendingEditItem = { ...base, date: dateValue, displayDate: "" };
+  editHasChanges = true;
+  renderEditPreviewCard(pendingEditItem);
+  updateManualDateDisplay();
   renderCalendar();
   playSavedSound();
-  showStatus("Изменено");
-  clearPhraseSoon();
+}
+
+function populateTimeSelects() {
+  if (hourSelect && !hourSelect.options.length) {
+    for (let h = 0; h < 24; h += 1) {
+      const option = document.createElement("option");
+      option.value = String(h).padStart(2, "0");
+      option.textContent = option.value;
+      hourSelect.appendChild(option);
+    }
+  }
+  if (minuteSelect && !minuteSelect.options.length) {
+    for (let m = 0; m < 60; m += 5) {
+      const option = document.createElement("option");
+      option.value = String(m).padStart(2, "0");
+      option.textContent = option.value;
+      minuteSelect.appendChild(option);
+    }
+  }
 }
 
 function renderCalendarTimeInput(item) {
-  if (!calendarTimeInput) {
+  if (!hourSelect || !minuteSelect) {
     return;
   }
+  populateTimeSelects();
 
-  calendarTimeInput.value = item.time || "";
+  let hh = "09";
+  let mm = "00";
+  if (/^\d{2}:\d{2}$/.test(item.time || "")) {
+    hh = item.time.slice(0, 2);
+    let minutes = parseInt(item.time.slice(3, 5), 10);
+    minutes = Math.round(minutes / 5) * 5;
+    if (minutes >= 60) minutes = 55;
+    mm = String(minutes).padStart(2, "0");
+  }
+  hourSelect.value = hh;
+  minuteSelect.value = mm;
 }
 
 function handleCalendarTimeSubmit(event) {
@@ -1842,19 +2106,15 @@ function handleCalendarTimeSubmit(event) {
 }
 
 function applyCalendarTimeInput(options = {}) {
-  if (!calendarTimeInput || !calendarItemId) {
+  if (!hourSelect || !minuteSelect || !calendarItemId) {
     return false;
   }
 
-  const value = normalize(calendarTimeInput.value);
+  const value = `${hourSelect.value}:${minuteSelect.value}`;
 
-  if (!value) {
-    return false;
-  }
+  const base = pendingEditItem || items.find((currentItem) => currentItem.id === calendarItemId);
 
-  const item = items.find((currentItem) => currentItem.id === calendarItemId);
-
-  if (!item) {
+  if (!base) {
     return false;
   }
 
@@ -1863,50 +2123,56 @@ function applyCalendarTimeInput(options = {}) {
     return "invalid";
   }
 
-  const updatedItem = {
-    ...item,
-    time: value,
-    period: "",
-  };
-
-  updateItem(updatedItem);
-  renderEditDialogItem(updatedItem);
-  refreshSearchDialog();
-  renderCalendarTimeInput(updatedItem);
+  pendingEditItem = { ...base, time: value, period: "" };
+  editHasChanges = true;
+  renderEditPreviewCard(pendingEditItem);
 
   if (options.announce) {
     playSavedSound();
-    showStatus("Изменено");
-    clearPhraseSoon();
   }
 
   return true;
 }
 
-function clearCalendarItemTime() {
-  const item = items.find((currentItem) => currentItem.id === calendarItemId);
-
-  if (!item) {
+function applyEditNameInput() {
+  if (!editNameInput || !calendarItemId) {
     return;
   }
 
-  const updatedItem = {
-    ...item,
-    time: "",
-    period: "",
-  };
+  const value = editNameInput.value.trim();
 
-  updateItem(updatedItem);
-  renderEditDialogItem(updatedItem);
-  refreshSearchDialog();
-  renderCalendarTimeInput(updatedItem);
+  if (!value) {
+    return;
+  }
+
+  const base = pendingEditItem || items.find((currentItem) => currentItem.id === calendarItemId);
+
+  if (!base) {
+    return;
+  }
+
+  pendingEditItem = { ...base, name: value, source: value };
+  editHasChanges = true;
+  renderEditPreviewCard(pendingEditItem);
   playSavedSound();
-  showStatus("Изменено");
-  clearPhraseSoon();
+}
+
+function clearCalendarItemTime() {
+  const base = pendingEditItem || items.find((currentItem) => currentItem.id === calendarItemId);
+
+  if (!base) {
+    return;
+  }
+
+  pendingEditItem = { ...base, time: "", period: "" };
+  editHasChanges = true;
+  renderEditPreviewCard(pendingEditItem);
+  renderCalendarTimeInput(pendingEditItem);
+  playSavedSound();
 }
 
 function getRenamedItem(item, phrase) {
-  const match = phrase.match(/(?:^|\s)(?:измени|изменить)\s+название(?:\s+на)?\s+(.+)$/);
+  const match = phrase.match(/(?:^|\s)(?:измени|изменить)\s+название(?:\s+над?)?\s+(.+)$/);
 
   if (!match) {
     return null;
@@ -1925,7 +2191,9 @@ function getRecognizedPhraseText(phrase, result) {
   }
 
   if (result.type === "create") {
-    return formatCreatedPhraseText(phrase, result.item);
+    // В поле показываем то, что сказал пользователь («через 2 часа»),
+    // а не пересчитанное время (оно остаётся на карточке внизу).
+    return formatRecognizedPhraseText(phrase);
   }
 
   if (result.type !== "edit") {
@@ -1977,11 +2245,17 @@ function formatRecognizedPhraseText(phrase) {
 
 function getCorrectedItem(item, value) {
   const isCommand = isCorrectionCommand(value);
-  const commandType = getCorrectionCommandType(value);
+  let commandType = getCorrectionCommandType(value);
   const cleanedValue = getCorrectionTarget(value);
 
   if (!isCommand) {
     return null;
+  }
+
+  // Если человек не сказал ключевое слово («дату»/«время»),
+  // пробуем понять по смыслу: «измени на 9 июня» -> это дата.
+  if (!commandType) {
+    commandType = inferCorrectionType(item, cleanedValue);
   }
 
   if (!commandType) {
@@ -2053,21 +2327,52 @@ function getCorrectedItem(item, value) {
   const parsedDate = parsePhrase(`${item.name} ${getCorrectionDateTarget(cleanedValue)}`);
 
   if (parsedDate && parsedDate.name !== "предмет") {
-    const explicitTime = parsedDate.time || parseCorrectionTime(cleanedValue) || "";
-    const correctedTime = explicitTime || item.time || "";
-    const correctedPeriod = explicitTime ? "" : (parsedDate.period || item.period || "");
-
+    // Команда «изменить дату» меняет ТОЛЬКО дату — время и часть дня не трогаем.
     return {
       ...item,
       date: parsedDate.date,
-      time: correctedTime,
-      period: correctedPeriod,
       displayDate: parsedDate.displayDate || "",
       source: value.trim(),
     };
   }
 
   return null;
+}
+
+function looksLikeDateTarget(value) {
+  return (
+    /(завтра|послезавтра|сегодня)/.test(value) ||
+    /следующ/.test(value) ||
+    isRelativeDateTarget(value) ||
+    /(январ|феврал|март|апрел|\bма[йя]\b|июн|июл|август|сентябр|октябр|ноябр|декабр)/.test(value) ||
+    monthMap[value] !== undefined
+  );
+}
+
+function inferCorrectionType(item, cleanedValue) {
+  if (!cleanedValue) {
+    return "";
+  }
+
+  // Сначала проверяем дату (если в словах есть месяц/«завтра»/«следующий» и т.п.).
+  if (looksLikeDateTarget(cleanedValue)) {
+    const parsedDate = parsePhrase(`${item.name} ${getCorrectionDateTarget(cleanedValue)}`);
+
+    if (parsedDate && parsedDate.name !== "предмет") {
+      return "date";
+    }
+  }
+
+  // Иначе пробуем как время.
+  if (
+    getRelativeCorrectionTime(cleanedValue) ||
+    parseDayPeriod(cleanedValue) ||
+    parseCorrectionTime(cleanedValue)
+  ) {
+    return "time";
+  }
+
+  return "";
 }
 
 function getRelativeCorrectionTime(value) {
@@ -2112,11 +2417,11 @@ function getCorrectionCommandType(value) {
 function getCorrectionTarget(value) {
   return normalize(value)
     .replace(/^(измени|изменить|добавь|добавить|удали|удалить|убери|убрать)\s+/, "")
-    .replace(/^название(?:\s+на)?\s+/, "")
-    .replace(/^дат[ауые](?:\s+на)?\s+/, "")
-    .replace(/^срок(?:\s+на)?\s+/, "")
-    .replace(/^время(?:\s+на)?\s+/, "")
-    .replace(/^на\s+/, "")
+    .replace(/^название(?:\s+над?)?\s+/, "")
+    .replace(/^дат[ауые](?:\s+над?)?\s+/, "")
+    .replace(/^срок(?:\s+над?)?\s+/, "")
+    .replace(/^время(?:\s+над?)?\s+/, "")
+    .replace(/^над?\s+/, "")
     .trim();
 }
 
@@ -2229,7 +2534,17 @@ function openEditDialog(item) {
   }
 
   editModal.hidden = false;
-  renderEditDialogItem(item);
+  editHasChanges = false;
+  pendingEditItem = null;
+  editVoiceActive = false;
+  clearTimeout(editVoiceSilenceTimer);
+  hideEditConfirmButton();
+  if (editVoiceStartButton) {
+    editVoiceStartButton.classList.remove("is-listening");
+    editVoiceStartButton.textContent = "старт";
+  }
+  renderEditOriginalCard(item);
+  renderEditPreviewCard(item);
   showVoiceEditPanel();
 
   if (!isSearchDialogOpen()) {
@@ -2262,9 +2577,9 @@ function showVoiceEditPanel() {
 }
 
 function showManualEditPanel() {
-  const item = items.find((currentItem) => currentItem.id === editingItemId);
+  const original = items.find((currentItem) => currentItem.id === editingItemId);
 
-  if (!item || !editManualPanel) {
+  if (!original || !editManualPanel) {
     return;
   }
 
@@ -2282,12 +2597,23 @@ function showManualEditPanel() {
     editManualButton.classList.add("is-active");
   }
 
-  const date = parseIsoDate(item.date);
-  calendarItemId = item.id;
+  const base = pendingEditItem || original;
+  const date = parseIsoDate(base.date);
+  calendarItemId = original.id;
   calendarYear = date.getFullYear();
   calendarMonth = date.getMonth();
-  renderCalendarTimeInput(item);
+  if (editNameInput) {
+    editNameInput.value = "";
+    editNameInput.placeholder = "название";
+  }
+  if (calendarWrap) {
+    calendarWrap.hidden = true;
+  }
+  renderCalendarTimeInput(base);
   renderCalendar();
+  updateManualDateDisplay();
+  renderEditOriginalCard(original);
+  renderEditPreviewCard(base);
 }
 
 function startEditVoiceListening() {
@@ -2300,12 +2626,90 @@ function startEditVoiceListening() {
     return;
   }
 
+  // Повторное нажатие — стоп.
+  if (editVoiceActive) {
+    stopEditVoiceListening();
+    return;
+  }
+
+  unlockAudio();
   isSeriesActive = false;
+  isSearchActive = false;
+  editVoiceActive = true;
   setRecognitionContinuous(false);
-  startButton.classList.add("is-listening");
-  showStatus("скажи команду изменения");
-  resetEditModalTimer();
+  if (editVoiceStartButton) {
+    editVoiceStartButton.classList.add("is-listening");
+    editVoiceStartButton.textContent = "стоп";
+  }
+  showEditConfirmButton();
+  hideStatus();
   restartRecognition();
+  resetEditVoiceSilenceTimer();
+}
+
+function stopEditVoiceListening() {
+  editVoiceActive = false;
+  clearTimeout(editVoiceSilenceTimer);
+  clearTimeout(restartTimer);
+  shouldSkipNextRestart = true;
+  try {
+    recognition.stop();
+  } catch (error) {}
+  if (editVoiceStartButton) {
+    editVoiceStartButton.classList.remove("is-listening");
+    editVoiceStartButton.textContent = "старт";
+  }
+  // «ок» остаётся, если были изменения; иначе прячем.
+  if (editHasChanges) {
+    showEditConfirmButton();
+  } else {
+    hideEditConfirmButton();
+  }
+}
+
+function resetEditVoiceSilenceTimer() {
+  clearTimeout(editVoiceSilenceTimer);
+  if (!editVoiceActive) {
+    return;
+  }
+  editVoiceSilenceTimer = setTimeout(() => {
+    stopEditVoiceListening();
+  }, 7000);
+}
+
+function showEditConfirmButton() {
+  if (editConfirmButton) {
+    editConfirmButton.hidden = false;
+  }
+}
+
+function hideEditConfirmButton() {
+  if (editConfirmButton) {
+    editConfirmButton.hidden = true;
+  }
+}
+
+function attemptCloseEdit() {
+  if (editVoiceActive) {
+    stopEditVoiceListening();
+  }
+  // Крестик — сразу на главную, без вопроса (вопрос только по кнопке «ок»).
+  closeEditDialog();
+}
+
+function showSaveConfirm() {
+  if (editVoiceActive) {
+    stopEditVoiceListening();
+  }
+  showConfirm("сохранить изменения?", () => {
+    if (pendingEditItem) {
+      updateItem(pendingEditItem);
+      refreshSearchDialog();
+    }
+    editHasChanges = false;
+    pendingEditItem = null;
+    closeEditDialog();
+  }, { yesLabel: "сохранить", noLabel: "отмена", yesColor: "var(--color-primary)" });
 }
 
 function closeEditDialog() {
@@ -2313,11 +2717,22 @@ function closeEditDialog() {
     return;
   }
 
-  if (isCalendarDialogOpen() && applyCalendarTimeInput() === "invalid") {
-    return;
+  editVoiceActive = false;
+  editHasChanges = false;
+  pendingEditItem = null;
+  clearTimeout(editVoiceSilenceTimer);
+  hideEditConfirmButton();
+  if (editVoiceStartButton) {
+    editVoiceStartButton.classList.remove("is-listening");
+    editVoiceStartButton.textContent = "старт";
   }
 
   editModal.hidden = true;
+  clearPhraseInput();
+  hideStatus();
+  if (document.activeElement && typeof document.activeElement.blur === "function") {
+    document.activeElement.blur();
+  }
   clearTimeout(editModalTimer);
   editingItemId = null;
   calendarItemId = null;
@@ -2340,15 +2755,61 @@ function isEditDialogOpen() {
 }
 
 function resetEditModalTimer() {
+  // Авто-закрытие окна изменения отключено: закрывается только кнопкой «закрыть».
   clearTimeout(editModalTimer);
+}
 
-  if (!isEditDialogOpen()) {
+function renderEditPreviewCard(item) {
+  [editPreviewCard, editManualPreview].forEach((el) => {
+    if (!el) {
+      return;
+    }
+    el.innerHTML = "";
+    if (item) {
+      el.append(buildItemCard(item));
+    }
+  });
+}
+
+function renderEditOriginalCard(item) {
+  [editCard, editManualCard].forEach((el) => {
+    if (!el) {
+      return;
+    }
+    el.innerHTML = "";
+    if (item) {
+      el.append(buildItemCard(item));
+    }
+  });
+}
+
+function updateManualDateDisplay() {
+  if (!manualDateDisplay) {
     return;
   }
+  const base = pendingEditItem || items.find((currentItem) => currentItem.id === calendarItemId);
+  manualDateDisplay.value = base ? getItemDateText(base) : "";
+}
 
-  editModalTimer = setTimeout(() => {
-    closeEditDialog();
-  }, MODAL_IDLE_TIMEOUT_MS);
+function buildItemCard(item) {
+  const card = document.createElement("div");
+  card.className = "edit-card";
+
+  const name = document.createElement("p");
+  const date = document.createElement("p");
+  const time = document.createElement("p");
+
+  name.className = "edit-card-name";
+  date.className = "edit-card-date";
+  time.className = "edit-card-time";
+
+  appendLabeledText(name, "название", formatDisplayName(item.name));
+  appendLabeledText(date, "дата", getItemDateText(item));
+  appendLabeledText(time, "время", getItemTimeText(item));
+  time.hidden = !getItemTimeText(item);
+
+  card.append(name, date, time);
+  return card;
 }
 
 function renderEditDialogItem(item) {
@@ -2361,20 +2822,17 @@ function renderEditDialogItem(item) {
   const name = document.createElement("p");
   const date = document.createElement("p");
   const time = document.createElement("p");
-  const days = document.createElement("p");
 
   name.className = "edit-card-name";
   date.className = "edit-card-date";
   time.className = "edit-card-time";
-  days.className = "edit-card-days";
 
   appendLabeledText(name, "название", formatDisplayName(item.name));
   appendLabeledText(date, "дата", getItemDateText(item));
   appendLabeledText(time, "время", getItemTimeText(item));
   time.hidden = !getItemTimeText(item);
-  days.textContent = formatDaysLeftVisible(item.date);
 
-  editCard.append(name, date, time, days);
+  editCard.append(name, date, time);
 }
 
 function cancelEditing() {
@@ -2396,6 +2854,19 @@ function cancelEditing() {
 
 function cancelSearch() {
   isSearchActive = false;
+  manualSearchMode = false;
+  clearTimeout(searchSilenceTimer);
+  clearTimeout(manualSearchTimer);
+  hideStatus();
+  setStartButtonLabel("старт");
+
+  if (manualInput && document.activeElement === manualInput) {
+    manualInput.blur();
+  }
+
+  if (manualPlaceholder) {
+    manualPlaceholder.textContent = "или напиши";
+  }
 
   if (searchButton) {
     searchButton.classList.remove("is-listening");
@@ -2404,6 +2875,7 @@ function cancelSearch() {
   if (startButton) {
     startButton.classList.remove("is-listening");
   }
+  setStartButtonLabel("старт");
 }
 
 function startEditingItem(id) {
@@ -2447,13 +2919,24 @@ function startSeriesListening() {
 
   cancelEditing();
   cancelSearch();
+  shouldSkipNextRestart = false;
   isSeriesActive = true;
   setRecognitionContinuous(false);
   startButton.classList.add("is-listening");
-  showSeriesOkButton();
-  showStatus("Слушаю, можно сказать несколько фраз");
+  setStartButtonLabel("стоп");
+  if (startHint) {
+    startHint.textContent = "Слушаю, можно сказать несколько напоминаний";
+  }
   lastErrorPhrase = "";
   restartRecognition();
+  resetSeriesSilenceTimer();
+}
+
+function setStartButtonLabel(text) {
+  const label = startButton && startButton.querySelector(".start-text");
+  if (label) {
+    label.textContent = text;
+  }
 }
 
 function stopSeriesListening() {
@@ -2461,6 +2944,10 @@ function stopSeriesListening() {
   clearTimeout(restartTimer);
   clearTimeout(seriesSilenceTimer);
   startButton.classList.remove("is-listening");
+  setStartButtonLabel("старт");
+  if (startHint) {
+    startHint.textContent = "Нажми старт и скажи";
+  }
   hideSeriesOkButton();
   setRecognitionContinuous(false);
 
@@ -2567,7 +3054,9 @@ function parsePhrase(value, options = {}) {
     };
   }
 
-  const parsedTime = time || getTimeFromRelative(relative);
+  // Для «через N часов/минут» время берём из расчёта «через», а не из часов
+  // (иначе «через 2 часа» путается с «в 2 часа» = 14:00).
+  const parsedTime = getTimeFromRelative(relative) || time;
   const approximate = parseApproximateDate(phrase);
   if (approximate) {
     return {
@@ -3269,7 +3758,7 @@ function cleanName(name) {
       .replace(/\b(утром|утро|днем|днём|день|вечером|вечер|ночью|ночь)\b/g, "")
       .replace(/[.,!?]+/g, "")
       .replace(/\s+/g, " ")
-      .replace(/\bна\s*$/g, "")
+      .replace(/(?:^|\s)(?:на|до)\s*$/g, "")
       .trim()
       || "предмет"
   );
@@ -3283,6 +3772,52 @@ function formatDisplayName(value) {
   return value.toLocaleLowerCase("ru-RU");
 }
 
+function showConfirm(message, onConfirm, options = {}) {
+  const overlay = document.createElement("div");
+  overlay.style.cssText =
+    "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);" +
+    "display:flex;align-items:center;justify-content:center;padding:20px;";
+  const box = document.createElement("div");
+  box.style.cssText =
+    "background:#fff;color:#222;border-radius:16px;padding:22px;max-width:340px;" +
+    "width:100%;text-align:center;display:flex;flex-direction:column;gap:18px;";
+  const text = document.createElement("p");
+  text.textContent = message;
+  text.style.cssText = "margin:0;font-size:18px;";
+  const row = document.createElement("div");
+  row.style.cssText = "display:flex;gap:10px;";
+  const yes = document.createElement("button");
+  yes.type = "button";
+  yes.textContent = options.yesLabel || "да";
+  yes.style.cssText =
+    "flex:1;min-height:46px;border:0;border-radius:12px;font-size:16px;color:#fff;" +
+    "background:" + (options.yesColor || "var(--color-danger,#d23c3c)") + ";";
+  const no = document.createElement("button");
+  no.type = "button";
+  no.textContent = options.noLabel || "отмена";
+  no.style.cssText =
+    "flex:1;min-height:46px;border:0;border-radius:12px;font-size:16px;" +
+    "background:#e2e2e2;color:#222;";
+  yes.addEventListener("click", () => { overlay.remove(); onConfirm(); });
+  no.addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) overlay.remove();
+  });
+  row.append(no, yes);
+  if (options.cardNode) {
+    const cardWrap = document.createElement("div");
+    cardWrap.style.cssText =
+      "background:var(--color-soft,#eef4f0);color:#222;border-radius:12px;" +
+      "padding:14px;text-align:left;";
+    cardWrap.append(options.cardNode);
+    box.append(cardWrap, text, row);
+  } else {
+    box.append(text, row);
+  }
+  overlay.append(box);
+  document.body.append(overlay);
+}
+
 function renderList() {
   list.innerHTML = "";
   list.setAttribute("role", "group");
@@ -3290,6 +3825,11 @@ function renderList() {
 
   if (topButton) {
     topButton.hidden = items.length < 3;
+  }
+
+  const timelineHead = document.querySelector(".timeline-head");
+  if (timelineHead) {
+    timelineHead.style.display = items.length === 0 ? "none" : "";
   }
 
   if (!items.length) {
@@ -3367,7 +3907,9 @@ function renderList() {
       startEditingItem(item.id);
     });
     deleteButton.addEventListener("click", () => {
-      deleteItem(item.id);
+      showConfirm("удалить напоминание?", () => {
+        deleteItem(item.id);
+      });
     });
 
     days.append(visibleDays, screenReaderDays);
@@ -3407,6 +3949,22 @@ function deleteItem(id) {
   renderList();
   scheduleAllNotifications();
   showStatus("удалено", SHORT_MESSAGE_VISIBLE_MS);
+}
+
+// Поправки частых ошибок распознавания голоса (слышит одно — пишем нужное).
+// Сюда можно дописывать новые пары: [что услышалось, на что заменить].
+const VOICE_CORRECTIONS = [
+  [/(^|[^а-яёa-z])то\s+есть(?![а-яёa-z])/gi, "$1тест"],
+  [/\btest\b/gi, "тест"],
+  [/^\s*ты\s*$/i, "тест"],
+];
+
+function applyVoiceCorrections(text) {
+  let result = text || "";
+  for (const [pattern, replacement] of VOICE_CORRECTIONS) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
 }
 
 function getFinalPhraseFromResult(event) {
@@ -3466,24 +4024,23 @@ function splitSeriesPhrase(value) {
 }
 
 function setupSpeech() {
-  const SpeechRecognition =
-    window.SpeechRecognition || window.webkitSpeechRecognition;
+  const BrowserRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-  if (!SpeechRecognition) {
+  if (!BrowserRecognition) {
     showStatus(
       getVoiceUnavailableMessage(),
     );
     return;
   }
 
-  recognition = new SpeechRecognition();
+  recognition = new BrowserRecognition();
   recognition.lang = "ru-RU";
   recognition.continuous = false;
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
 
   recognition.addEventListener("result", async (event) => {
-    const phrase = getFinalPhraseFromResult(event);
+    const phrase = applyVoiceCorrections(getFinalPhraseFromResult(event));
 
     if (!phrase) {
       return;
@@ -3520,7 +4077,11 @@ function setupSpeech() {
       announceToScreenReader(`распознано: ${displayedPhrase}`);
     }
 
-    if (!isSeriesActive && !isEditDialogOpen() && result !== false) {
+    if (editingItemId && result && result.type === "edit") {
+      editHasChanges = true;
+      showEditConfirmButton();
+      resetEditVoiceSilenceTimer();
+    } else if (!isSeriesActive && !isEditDialogOpen() && result !== false) {
       stopSeriesListening();
     } else if (isSeriesActive && result !== false) {
       resetSeriesSilenceTimer();
@@ -3535,33 +4096,58 @@ function setupSpeech() {
       return;
     }
 
-    if (!isSeriesActive && !isEditDialogOpen()) {
-      startButton.classList.remove("is-listening");
-      if (searchButton) {
-        searchButton.classList.remove("is-listening");
-      }
+    // Перезапускаем прослушивание в режиме серии и в голосовом изменении.
+    if (isSeriesActive || editVoiceActive || isSearchActive) {
+      clearTimeout(restartTimer);
+      restartTimer = setTimeout(startRecognition, 80);
       return;
     }
 
-    clearTimeout(restartTimer);
-    restartTimer = setTimeout(startRecognition, 80);
+    // Остальное — останавливаемся, как у главной кнопки.
+    startButton.classList.remove("is-listening");
+    if (editVoiceStartButton) {
+      editVoiceStartButton.classList.remove("is-listening");
+    }
+    if (searchButton) {
+      searchButton.classList.remove("is-listening");
+    }
   });
 
   recognition.addEventListener("error", (event) => {
     isRecognitionRunning = false;
 
-    if (isSeriesActive && event.error === "no-speech") {
+    // В серии и в голосовом изменении молчание не прерывает — продолжаем слушать.
+    if ((isSeriesActive || editVoiceActive || isSearchActive) && event.error === "no-speech") {
       return;
     }
 
-    if (!isSeriesActive && !isEditDialogOpen()) {
-      startButton.classList.remove("is-listening");
-      if (searchButton) {
-        searchButton.classList.remove("is-listening");
-      }
+    if (isSearchActive) {
+      cancelSearch();
+    }
+    if (editVoiceActive) {
+      stopEditVoiceListening();
+    }
+    startButton.classList.remove("is-listening");
+    if (searchButton) {
+      searchButton.classList.remove("is-listening");
+    }
+    if (editVoiceStartButton) {
+      editVoiceStartButton.classList.remove("is-listening");
     }
 
-    showStatus(getRecognitionErrorMessage());
+    // Молчание не показываем как ошибку, чтобы надпись не висела.
+    if (event.error !== "no-speech") {
+      showStatus(getRecognitionErrorMessage());
+    }
+  });
+
+  recognition.addEventListener("speechstart", () => {
+    if (isSeriesActive) {
+      resetSeriesSilenceTimer();
+    }
+    if (editVoiceActive) {
+      resetEditVoiceSilenceTimer();
+    }
   });
 }
 
@@ -3604,7 +4190,21 @@ async function requestNotificationPermission() {
   }
 
   if (!("Notification" in window)) {
-    showNotifyStatus("этот браузер не поддерживает уведомления");
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.navigator.standalone === true;
+
+    if (!standalone && isIosDevice()) {
+      showNotifyStatus(
+        "на айфоне: открой в Safari, нажми Поделиться → «На экран «Домой»», открой с иконки и снова включи уведомления",
+      );
+    } else if (!standalone) {
+      showNotifyStatus(
+        "сначала установи приложение: меню браузера → «Установить приложение», открой с иконки и снова включи",
+      );
+    } else {
+      showNotifyStatus("этот браузер не поддерживает уведомления");
+    }
     return;
   }
 
@@ -3636,6 +4236,11 @@ function showStatus(message, visibleMs = MESSAGE_VISIBLE_MS) {
   requestAnimationFrame(() => {
     statusText.classList.add("is-visible");
   });
+
+  // Во время записи и поиска сообщение держится до конца сессии.
+  if (isSeriesActive || isSearchActive) {
+    return;
+  }
 
   statusTimer = setTimeout(() => {
     statusText.classList.remove("is-visible");
@@ -3775,14 +4380,14 @@ function unlockAudio() {
 function playSavedBeep() {
   const oscillator = audioContext.createOscillator();
   const gain = audioContext.createGain();
-  const now = audioContext.currentTime;
+  const now = audioContext.currentTime + 0.05;
 
   oscillator.type = "sine";
   oscillator.frequency.setValueAtTime(660, now);
   oscillator.frequency.setValueAtTime(880, now + 0.08);
 
   gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.08, now + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.05, now + 0.015);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
 
   oscillator.connect(gain);
@@ -3797,7 +4402,7 @@ function playAlarmSound() {
   }
 
   [0, 0.45, 0.9, 1.35].forEach((offset) => {
-    playAlarmBeep(audioContext.currentTime + offset);
+    playAlarmBeep(audioContext.currentTime + 0.05 + offset);
   });
 }
 
@@ -3809,7 +4414,7 @@ function playAlarmBeep(startTime) {
   oscillator.frequency.setValueAtTime(760, startTime);
 
   gain.gain.setValueAtTime(0.0001, startTime);
-  gain.gain.exponentialRampToValueAtTime(0.12, startTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.07, startTime + 0.02);
   gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.32);
 
   oscillator.connect(gain);
@@ -3820,6 +4425,11 @@ function playAlarmBeep(startTime) {
 
 function clearPhraseSoon() {
   clearTimeout(phraseTimer);
+
+  // В режиме записи фраза в поле держится до остановки.
+  if (isSeriesActive) {
+    return;
+  }
 
   phraseTimer = setTimeout(() => {
     clearPhraseInput();
@@ -3873,6 +4483,24 @@ function removeExpiredItems() {
 
   items = activeItems;
   saveItems();
+}
+
+// Раз в 20 секунд убираем просроченные карточки и обновляем список —
+// независимо от того, разрешены уведомления или нет.
+function startExpiryTicker() {
+  if (expiryTickerId) {
+    clearInterval(expiryTickerId);
+  }
+
+  expiryTickerId = setInterval(() => {
+    const before = items.length;
+    removeExpiredItems();
+
+    if (items.length !== before) {
+      renderList();
+      scheduleAllNotifications();
+    }
+  }, 20000);
 }
 
 function isExpiredItem(item) {
@@ -3941,8 +4569,16 @@ function scheduleNotification(item, notificationTime) {
   const timerId = setTimeout(() => {
     showReminderNotification(item);
 
-    if (isAlarmItem(item)) {
-      playAlarmSound();
+    // Звук — если включён в настройках.
+    if (reminderSettings.sound) {
+      playReminderSound();
+    }
+
+    // Всплывающее окно — если включено и приложение открыто.
+    if (reminderSettings.popup &&
+        typeof document !== "undefined" &&
+        document.visibilityState === "visible") {
+      showInAppReminder(item);
     }
 
     if (notificationTime.getTime() === parseItemDateTime(item).getTime()) {
@@ -3961,6 +4597,10 @@ async function showReminderNotification(item) {
     body: `${formatDisplayName(item.name)}: ${formatItemDate(item)}`,
     icon: "./icons/icon-192.png",
     badge: "./icons/icon-192.png",
+    vibrate: [300, 150, 300, 150, 300],
+    requireInteraction: true,
+    tag: item.id,
+    renotify: true,
   };
 
   try {
@@ -3981,6 +4621,50 @@ async function showReminderNotification(item) {
 
 function isAlarmItem(item) {
   return normalize(item.name).includes("будильник");
+}
+
+// Звуковой сигнал напоминания: три коротких бипа подряд.
+function playReminderSound() {
+  playAlarmSound();
+  setTimeout(playAlarmSound, 450);
+  setTimeout(playAlarmSound, 900);
+}
+
+// Заметное всплывающее окно прямо в приложении, когда оно открыто.
+function showInAppReminder(item) {
+  const text = `Напоминание: ${formatDisplayName(item.name)}`;
+  announceToScreenReader(text);
+
+  try {
+    let banner = document.querySelector(".reminder-alert");
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.className = "reminder-alert";
+      banner.setAttribute("role", "alert");
+      banner.style.cssText =
+        "position:fixed;left:50%;top:18px;transform:translateX(-50%);" +
+        "z-index:99999;max-width:90%;box-sizing:border-box;background:#167348;" +
+        "color:#fff;padding:16px 20px;border-radius:16px;" +
+        "box-shadow:0 10px 34px rgba(0,0,0,.35);font-size:18px;line-height:1.3;" +
+        "text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center;";
+      document.body.appendChild(banner);
+    }
+
+    banner.innerHTML = "";
+    const message = document.createElement("div");
+    message.textContent = text;
+    banner.appendChild(message);
+
+    // Окно висит подольше, чтобы успеть прочитать.
+    clearTimeout(banner._hideTimer);
+    banner._hideTimer = setTimeout(() => {
+      if (banner && banner.parentNode) banner.remove();
+    }, 2600);
+  } catch (error) {
+    // если не вышло показать окно — хотя бы строкой статуса
+  }
+
+  showStatus(text, 20000);
 }
 
 function sortByDate(listItems) {

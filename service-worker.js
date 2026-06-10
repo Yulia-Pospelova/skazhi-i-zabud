@@ -1,4 +1,4 @@
-const CACHE_NAME = "skazhi-i-zabud-v4";
+const CACHE_NAME = "skazhi-i-zabud-v76";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -8,9 +8,6 @@ const APP_SHELL = [
   "./styles/variables.css",
   "./styles/globals.css",
   "./styles/style.css",
-  "./styles/vosk-test.css",
-  "./vosk-test.html",
-  "./vosk-test.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon.svg",
@@ -36,6 +33,14 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+function isCacheFirst(pathname) {
+  return (
+    pathname.includes("/fonts/") ||
+    pathname.includes("/icons/") ||
+    pathname.endsWith(".css")
+  );
+}
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
 
@@ -49,20 +54,37 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  const isDocument =
+    request.mode === "navigate" || request.destination === "document";
+
+  if (!isDocument && isCacheFirst(requestUrl.pathname)) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) {
+          return cached;
+        }
+        return fetch(request).then((networkResponse) => {
+          const clone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          return networkResponse;
+        });
+      }),
+    );
+    return;
+  }
+
   event.respondWith(
     fetch(request)
       .then((networkResponse) => {
-        const responseClone = networkResponse.clone();
-
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(request, responseClone);
-        });
-
+        const clone = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         return networkResponse;
       })
-      .catch(() => caches.match(request).then((cachedResponse) => (
-        cachedResponse || caches.match("./index.html")
-      ))),
+      .catch(() => (
+        caches.match(request).then((cachedResponse) => (
+          cachedResponse || caches.match("./index.html")
+        ))
+      )),
   );
 });
 
