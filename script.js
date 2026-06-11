@@ -765,7 +765,6 @@ function stopSearchVoice() {
     startButton.classList.remove("is-listening");
   }
   setStartButtonLabel("старт");
-  playVoiceEndSound();
 }
 
 function startManualIdleTimer() {
@@ -808,7 +807,6 @@ function startSearchListening() {
   setRecognitionContinuous(false);
   startButton.classList.add("is-listening");
   setStartButtonLabel("стоп");
-  playVoiceStartSound();
   if (manualPlaceholder) {
     manualPlaceholder.textContent = "поиск";
   }
@@ -2730,7 +2728,6 @@ function startEditVoiceListening() {
     editVoiceStartButton.classList.add("is-listening");
     editVoiceStartButton.textContent = "стоп";
   }
-  playVoiceStartSound();
   showEditConfirmButton();
   hideStatus();
   restartRecognition();
@@ -2738,7 +2735,6 @@ function startEditVoiceListening() {
 }
 
 function stopEditVoiceListening() {
-  const wasEditVoiceActive = editVoiceActive;
   editVoiceActive = false;
   clearTimeout(editVoiceSilenceTimer);
   clearTimeout(restartTimer);
@@ -2749,9 +2745,6 @@ function stopEditVoiceListening() {
   if (editVoiceStartButton) {
     editVoiceStartButton.classList.remove("is-listening");
     editVoiceStartButton.textContent = "старт";
-  }
-  if (wasEditVoiceActive) {
-    playVoiceEndSound();
   }
   // «ок» остаётся, если были изменения; иначе прячем.
   if (editHasChanges) {
@@ -3024,7 +3017,6 @@ function startSeriesListening() {
   setRecognitionContinuous(false);
   startButton.classList.add("is-listening");
   setStartButtonLabel("стоп");
-  playVoiceStartSound();
   if (startHint) {
     startHint.textContent = "Слушаю, можно сказать несколько напоминаний";
   }
@@ -3041,7 +3033,6 @@ function setStartButtonLabel(text) {
 }
 
 function stopSeriesListening() {
-  const wasSeriesActive = isSeriesActive;
   isSeriesActive = false;
   clearTimeout(restartTimer);
   clearTimeout(seriesSilenceTimer);
@@ -3052,9 +3043,6 @@ function stopSeriesListening() {
   }
   hideSeriesOkButton();
   setRecognitionContinuous(false);
-  if (wasSeriesActive) {
-    playVoiceEndSound();
-  }
 
   try {
     recognition.stop();
@@ -4467,14 +4455,6 @@ function playSavedSound() {
   playSavedBeep();
 }
 
-function playVoiceStartSound() {
-  playVoiceCue(520, 700);
-}
-
-function playVoiceEndSound() {
-  playVoiceCue(700, 520);
-}
-
 function unlockAudio() {
   const AudioContext = window.AudioContext || window.webkitAudioContext;
 
@@ -4489,33 +4469,6 @@ function unlockAudio() {
   }
 
   return true;
-}
-
-function playVoiceCue(startFrequency, endFrequency) {
-  if (!unlockAudio()) {
-    return;
-  }
-
-  if (audioContext.state === "suspended") {
-    return;
-  }
-
-  const oscillator = audioContext.createOscillator();
-  const gain = audioContext.createGain();
-  const now = audioContext.currentTime + 0.03;
-
-  oscillator.type = "sine";
-  oscillator.frequency.setValueAtTime(startFrequency, now);
-  oscillator.frequency.linearRampToValueAtTime(endFrequency, now + 0.11);
-
-  gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.012, now + 0.012);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
-
-  oscillator.connect(gain);
-  gain.connect(audioContext.destination);
-  oscillator.start(now);
-  oscillator.stop(now + 0.13);
 }
 
 function playSavedBeep() {
