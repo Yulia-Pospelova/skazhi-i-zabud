@@ -1616,7 +1616,7 @@ async function handleManualSubmit(event) {
     return;
   }
 
-  const result = await handlePhrase(value, { preferWrittenTime: true });
+  const result = await handlePhrase(value, { preferWrittenTime: true, preserveNameCase: true });
 
   if (result !== false) {
     manualInput.value = "";
@@ -3142,6 +3142,10 @@ function restartRecognition() {
 function parsePhrase(value, options = {}) {
   lastParseError = "";
   const phrase = normalize(value);
+  const sourceText = value.trim();
+  const getName = (endIndex) => getParsedName(
+    options.preserveNameCase ? sourceText.slice(0, endIndex) : phrase.slice(0, endIndex),
+  );
 
   if (!phrase) {
     return null;
@@ -3154,7 +3158,7 @@ function parsePhrase(value, options = {}) {
   if (yearOnly) {
     return {
       id: createId(),
-      name: getParsedName(phrase.slice(0, yearOnly.index)),
+      name: getName(yearOnly.index),
       date: toIsoDate(yearOnly.date),
       time: null,
       period,
@@ -3170,7 +3174,7 @@ function parsePhrase(value, options = {}) {
   if (approximate) {
     return {
       id: createId(),
-      name: getParsedName(phrase.slice(0, approximate.index)),
+      name: getName(approximate.index),
       date: toIsoDate(approximate.date),
       time: parsedTime,
       period,
@@ -3183,7 +3187,7 @@ function parsePhrase(value, options = {}) {
   if (weekday) {
     return {
       id: createId(),
-      name: getParsedName(phrase.slice(0, weekday.index)),
+      name: getName(weekday.index),
       date: toIsoDate(weekday.date),
       time: parsedTime,
       period,
@@ -3193,7 +3197,7 @@ function parsePhrase(value, options = {}) {
 
   const exact = parseExactDate(phrase, relative);
   if (exact) {
-    const name = getParsedName(phrase.slice(0, exact.index));
+    const name = getName(exact.index);
 
     return {
       id: createId(),
@@ -3208,7 +3212,7 @@ function parsePhrase(value, options = {}) {
 
   const named = parseNamedDate(phrase);
   if (named) {
-    const name = getParsedName(phrase.slice(0, named.index));
+    const name = getName(named.index);
 
     return {
       id: createId(),
@@ -3221,7 +3225,7 @@ function parsePhrase(value, options = {}) {
   }
 
   if (relative) {
-    const name = getParsedName(phrase.slice(0, relative.index));
+    const name = getName(relative.index);
 
     return {
       id: createId(),
