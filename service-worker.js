@@ -1,4 +1,4 @@
-const CACHE_NAME = "skazhi-i-zabud-v92";
+const CACHE_NAME = "skazhi-i-zabud-v93";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -36,8 +36,7 @@ self.addEventListener("activate", (event) => {
 function isCacheFirst(pathname) {
   return (
     pathname.includes("/fonts/") ||
-    pathname.includes("/icons/") ||
-    pathname.endsWith(".css")
+    pathname.includes("/icons/")
   );
 }
 
