@@ -1,18 +1,20 @@
 :root {
-  --color-text: #0d1511;
-  --color-muted: #24352c;
-  --color-page: #edf4ef;
-  --color-surface: #ffffff;
-  --color-soft: #f3f8f5;
-  --color-border: #d5e2d9;
-  --color-border-strong: #c1d0c6;
+  --color-text: #15201b;
+  --color-muted: #5f6f67;
+  --color-page: #eef5f0;
+  --color-surface: rgba(255, 255, 255, 0.76);
+  --color-soft: rgba(255, 255, 255, 0.58);
+  --color-border: rgba(255, 255, 255, 0.62);
+  --color-border-strong: rgba(22, 115, 72, 0.26);
   --color-primary: #167348;
   --color-focus: #0d5bd7;
   --color-danger: #b13b2e;
   --color-danger-text: #6a241e;
-  --color-danger-soft: #f4dfdc;
-  --color-control: #e4eee7;
-  --color-control-strong: #ddebe2;
-  --radius: 8px;
+  --color-danger-soft: rgba(244, 223, 220, 0.88);
+  --color-control: rgba(255, 255, 255, 0.66);
+  --color-control-strong: rgba(219, 235, 226, 0.82);
+  --shadow-panel: 0 24px 70px rgba(41, 54, 47, 0.18);
+  --shadow-card: 0 14px 34px rgba(55, 68, 61, 0.13);
+  --radius: 18px;
   --font-main: Arial, sans-serif;
 }
