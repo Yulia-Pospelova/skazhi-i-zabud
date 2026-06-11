@@ -1,7 +1,9 @@
 .page {
   min-inline-size: 320px;
   min-block-size: 100vh;
+  min-block-size: 100svh;
   min-block-size: 100dvb;
+  min-block-size: 100dvh;
   margin: 0 auto;
   font-family: var(--font-main);
   color: var(--color-text);
@@ -1074,6 +1076,9 @@ button:focus {
 .page {
   position: relative;
   overflow-x: hidden;
+  min-block-size: 100vh;
+  min-block-size: 100svh;
+  min-block-size: 100dvh;
   background:
     radial-gradient(circle at 12% 6%, rgba(255, 219, 185, 0.86), transparent 28rem),
     radial-gradient(circle at 88% 14%, rgba(122, 180, 214, 0.58), transparent 24rem),
@@ -1248,6 +1253,7 @@ h1 {
 @media (max-width: 540px) {
   .app {
     padding-inline: 12px;
+    padding-block-end: max(28px, env(safe-area-inset-bottom));
   }
 
   .capture {
@@ -1256,6 +1262,61 @@ h1 {
 
   .start-button {
     min-block-size: 148px;
+  }
+}
+
+@media (max-width: 540px) and (max-height: 760px) {
+  .app {
+    padding-block-start: 10px;
+    padding-block-end: max(18px, env(safe-area-inset-bottom));
+  }
+
+  .hero {
+    padding-block-end: 6px;
+  }
+
+  h1 {
+    margin-bottom: 6px;
+    font-size: 30px;
+  }
+
+  .capture {
+    padding: 12px;
+  }
+
+  .start-hint {
+    margin-bottom: 8px;
+    font-size: 15px;
+  }
+
+  .start-button {
+    min-block-size: 128px;
+  }
+
+  .start-text {
+    font-size: 30px;
+  }
+
+  .phrase-form {
+    margin-top: 8px;
+  }
+
+  .phrase-input {
+    min-block-size: 48px;
+    padding: 11px 12px;
+  }
+
+  .manual-form {
+    margin-top: 6px;
+  }
+
+  .manual-input {
+    min-block-size: 44px;
+    padding: 10px 12px;
+  }
+
+  .timeline {
+    margin-top: 10px;
   }
 }
 
