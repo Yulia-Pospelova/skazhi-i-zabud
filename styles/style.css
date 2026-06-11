@@ -1079,8 +1079,8 @@ button:focus {
   position: relative;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at 88% 10%, rgba(178, 220, 244, 0.62), transparent 26rem),
-    linear-gradient(180deg, #ffffff 0%, #f6fbfe 50%, #edf6fb 100%);
+    radial-gradient(circle at 16% 10%, rgba(211, 190, 242, 0.54), transparent 26rem),
+    linear-gradient(180deg, #ffffff 0%, #faf7ff 50%, #f1edf8 100%);
 }
 
 .page::before {
