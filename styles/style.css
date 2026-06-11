@@ -1075,10 +1075,10 @@ button:focus {
   position: relative;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at 12% 6%, rgba(255, 219, 185, 0.86), transparent 28rem),
-    radial-gradient(circle at 88% 14%, rgba(122, 180, 214, 0.58), transparent 24rem),
-    radial-gradient(circle at 82% 76%, rgba(119, 235, 214, 0.38), transparent 20rem),
-    linear-gradient(145deg, #f9f4ea 0%, #eef5f0 45%, #dceaf0 100%);
+    radial-gradient(circle at 18% 12%, rgba(164, 240, 224, 0.74), transparent 24rem),
+    radial-gradient(circle at 86% 10%, rgba(172, 214, 238, 0.72), transparent 24rem),
+    radial-gradient(circle at 78% 78%, rgba(188, 237, 209, 0.58), transparent 22rem),
+    linear-gradient(160deg, #f4faf5 0%, #e9f5ef 44%, #d7eef4 100%);
 }
 
 .page::before {
@@ -1087,8 +1087,8 @@ button:focus {
   inset: 0;
   z-index: -1;
   background:
-    linear-gradient(115deg, transparent 0 34%, rgba(14, 27, 37, 0.14) 34% 46%, transparent 46%),
-    radial-gradient(circle at 52% 42%, rgba(20, 25, 31, 0.13), transparent 18rem);
+    radial-gradient(ellipse at 30% 62%, rgba(255, 255, 255, 0.36), transparent 18rem),
+    radial-gradient(ellipse at 72% 40%, rgba(134, 214, 232, 0.2), transparent 20rem);
   pointer-events: none;
 }
 
@@ -1324,15 +1324,16 @@ h1 {
   --shadow-panel: 0 24px 66px rgba(99, 69, 42, 0.16);
   --shadow-card: 0 13px 30px rgba(99, 69, 42, 0.12);
   background:
-    radial-gradient(circle at 12% 6%, rgba(255, 213, 171, 0.95), transparent 24rem),
-    radial-gradient(circle at 88% 16%, rgba(128, 202, 177, 0.42), transparent 20rem),
+    radial-gradient(circle at 16% 8%, rgba(255, 215, 184, 0.96), transparent 24rem),
+    radial-gradient(circle at 82% 18%, rgba(160, 223, 202, 0.54), transparent 20rem),
+    radial-gradient(circle at 70% 78%, rgba(245, 196, 177, 0.34), transparent 22rem),
     linear-gradient(160deg, #fff8ef 0%, #f7efe5 50%, #eaf3ed 100%);
 }
 
 .page.theme-warm::before {
   background:
-    linear-gradient(115deg, transparent 0 34%, rgba(121, 78, 48, 0.1) 34% 46%, transparent 46%),
-    radial-gradient(circle at 55% 38%, rgba(112, 72, 42, 0.08), transparent 17rem);
+    radial-gradient(ellipse at 30% 62%, rgba(255, 255, 255, 0.34), transparent 18rem),
+    radial-gradient(ellipse at 70% 38%, rgba(255, 181, 148, 0.14), transparent 17rem);
 }
 
 .theme-warm .start-button {
@@ -1348,6 +1349,86 @@ h1 {
   background:
     radial-gradient(circle at 80% 18%, rgba(255, 175, 141, 0.22), transparent 3rem),
     rgba(238, 247, 235, 0.9);
+}
+
+.page.theme-pink {
+  --color-text: #251824;
+  --color-muted: #765e72;
+  --color-page: #f8eef7;
+  --color-surface: rgba(255, 255, 255, 0.78);
+  --color-soft: rgba(255, 255, 255, 0.58);
+  --color-border: rgba(255, 255, 255, 0.7);
+  --color-border-strong: rgba(195, 94, 159, 0.24);
+  --color-primary: #167348;
+  --color-control: rgba(255, 255, 255, 0.7);
+  --color-control-strong: rgba(245, 226, 242, 0.88);
+  --shadow-panel: 0 24px 70px rgba(91, 62, 88, 0.16);
+  --shadow-card: 0 14px 34px rgba(91, 62, 88, 0.12);
+  background:
+    radial-gradient(circle at 22% 18%, rgba(255, 169, 213, 0.78), transparent 24rem),
+    radial-gradient(circle at 82% 46%, rgba(169, 222, 242, 0.68), transparent 22rem),
+    radial-gradient(circle at 42% 78%, rgba(207, 174, 245, 0.46), transparent 22rem),
+    linear-gradient(160deg, #fbf1fa 0%, #f6dff0 45%, #dff4fb 100%);
+}
+
+.page.theme-pink::before {
+  background:
+    radial-gradient(ellipse at 34% 58%, rgba(255, 255, 255, 0.38), transparent 18rem),
+    radial-gradient(ellipse at 74% 36%, rgba(255, 179, 216, 0.18), transparent 20rem);
+}
+
+.theme-pink .start-button {
+  background:
+    radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.24), transparent 4rem),
+    linear-gradient(145deg, #198350, #0f633d);
+}
+
+.theme-pink .item-days,
+.theme-pink .search-result-days,
+.theme-pink .edit-card-days {
+  background:
+    radial-gradient(circle at 80% 18%, rgba(255, 177, 218, 0.24), transparent 3rem),
+    rgba(232, 245, 239, 0.9);
+}
+
+.page.theme-aqua {
+  --color-text: #102123;
+  --color-muted: #547073;
+  --color-page: #ebfaf8;
+  --color-surface: rgba(255, 255, 255, 0.76);
+  --color-soft: rgba(255, 255, 255, 0.58);
+  --color-border: rgba(255, 255, 255, 0.72);
+  --color-border-strong: rgba(10, 151, 166, 0.22);
+  --color-primary: #11725b;
+  --color-control: rgba(255, 255, 255, 0.66);
+  --color-control-strong: rgba(218, 244, 241, 0.88);
+  --shadow-panel: 0 24px 70px rgba(38, 78, 82, 0.15);
+  --shadow-card: 0 14px 34px rgba(38, 78, 82, 0.11);
+  background:
+    radial-gradient(circle at 18% 16%, rgba(158, 244, 233, 0.86), transparent 24rem),
+    radial-gradient(circle at 84% 22%, rgba(182, 228, 246, 0.7), transparent 22rem),
+    radial-gradient(circle at 72% 82%, rgba(0, 171, 187, 0.36), transparent 22rem),
+    linear-gradient(180deg, #f4fffb 0%, #dcf6f4 52%, #d6edf4 100%);
+}
+
+.page.theme-aqua::before {
+  background:
+    radial-gradient(ellipse at 30% 58%, rgba(255, 255, 255, 0.4), transparent 18rem),
+    radial-gradient(ellipse at 74% 38%, rgba(0, 171, 187, 0.12), transparent 18rem);
+}
+
+.theme-aqua .start-button {
+  background:
+    radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.24), transparent 4rem),
+    linear-gradient(145deg, #139078, #0d6556);
+}
+
+.theme-aqua .item-days,
+.theme-aqua .search-result-days,
+.theme-aqua .edit-card-days {
+  background:
+    radial-gradient(circle at 80% 18%, rgba(0, 171, 187, 0.2), transparent 3rem),
+    rgba(226, 246, 241, 0.92);
 }
 
 .page.theme-dark {
@@ -1374,8 +1455,8 @@ h1 {
 
 .page.theme-dark::before {
   background:
-    linear-gradient(115deg, transparent 0 34%, rgba(255, 255, 255, 0.06) 34% 46%, transparent 46%),
-    radial-gradient(circle at 55% 42%, rgba(255, 255, 255, 0.06), transparent 18rem);
+    radial-gradient(ellipse at 34% 58%, rgba(255, 255, 255, 0.08), transparent 18rem),
+    radial-gradient(ellipse at 72% 38%, rgba(91, 210, 168, 0.1), transparent 18rem);
 }
 
 .theme-dark .capture,
