@@ -269,8 +269,10 @@ h1 {
 .status {
   min-block-size: 20px;
   margin: 8px 0 0;
-  color: var(--color-muted);
-  font-size: 17px;
+  color: #15201b;
+  font-family: var(--font-main);
+  font-size: 16px;
+  font-weight: 500;
   line-height: 1.35;
   white-space: pre-line;
   opacity: 0;
@@ -311,8 +313,10 @@ h1 {
 .notify-status {
   min-block-size: 24px;
   margin: 10px 0 0;
-  color: var(--color-muted);
+  color: #15201b;
+  font-family: var(--font-main);
   font-size: 16px;
+  font-weight: 500;
   opacity: 0;
   transform: translateY(-3px);
   transition:
@@ -1075,10 +1079,9 @@ button:focus {
   position: relative;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at 12% 6%, rgba(255, 219, 185, 0.86), transparent 28rem),
-    radial-gradient(circle at 88% 14%, rgba(122, 180, 214, 0.58), transparent 24rem),
-    radial-gradient(circle at 82% 76%, rgba(119, 235, 214, 0.38), transparent 20rem),
-    linear-gradient(145deg, #f9f4ea 0%, #eef5f0 45%, #dceaf0 100%);
+    radial-gradient(circle at 92% 10%, rgba(185, 224, 241, 0.55), transparent 24rem),
+    radial-gradient(circle at 8% 88%, rgba(203, 238, 226, 0.5), transparent 22rem),
+    linear-gradient(180deg, #ffffff 0%, #f7fbfc 48%, #eef6f8 100%);
 }
 
 .page::before {
@@ -1103,6 +1106,7 @@ button:focus {
 
 h1 {
   margin-bottom: 10px;
+  color: #1f5f45;
   font-size: clamp(32px, 9vw, 44px);
   letter-spacing: 0;
 }
@@ -1113,8 +1117,11 @@ h1 {
 
 .capture,
 .timeline {
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.52));
+  border: 1px solid rgba(21, 32, 27, 0.12);
+  background:
+    radial-gradient(circle at 16% 10%, rgba(255, 219, 185, 0.28), transparent 16rem),
+    radial-gradient(circle at 86% 14%, rgba(122, 180, 214, 0.2), transparent 14rem),
+    rgba(238, 245, 240, 0.52);
   box-shadow: var(--shadow-panel);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
@@ -1136,21 +1143,24 @@ h1 {
   border: 1px solid rgba(255, 255, 255, 0.32);
   border-radius: 22px;
   background:
-    radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.3), transparent 4rem),
-    linear-gradient(145deg, #5aa77d, #347b5b);
-  box-shadow: 0 18px 40px rgba(22, 115, 72, 0.18);
+    radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.16), transparent 3.5rem),
+    linear-gradient(145deg, #39b978, #21865a);
+  box-shadow: 0 18px 40px rgba(22, 115, 72, 0.28);
+  color: #ffffff;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(8, 36, 22, 0.22);
 }
 
 .start-button.is-listening {
   background:
-    radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.28), transparent 4rem),
-    linear-gradient(145deg, #c97870, #a95750);
+    radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.14), transparent 3.5rem),
+    linear-gradient(145deg, #e06c62, #c6534b);
 }
 
 .edit-voice-start-button.is-listening {
   background:
     radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.22), transparent 4rem),
-    linear-gradient(145deg, #c97870, #a95750);
+    linear-gradient(145deg, #d8665d, #b94f47);
 }
 
 .start-icon {
@@ -1171,7 +1181,7 @@ h1 {
 
 .phrase-input,
 .manual-input {
-  border: 1px solid rgba(22, 115, 72, 0.22);
+  border: 1px solid rgba(21, 32, 27, 0.14);
   background: rgba(255, 255, 255, 0.74);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
@@ -1392,7 +1402,7 @@ h1 {
 .theme-pink .start-button {
   background:
     radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.24), transparent 4rem),
-    linear-gradient(145deg, #00BCD4, #0f633d);
+    linear-gradient(145deg, #198350, #0f633d);
 }
 
 .theme-pink .item-days,
@@ -1526,4 +1536,63 @@ h1 {
 .theme-dark .search-close-button,
 .theme-dark .examples-close-button {
   color: #ffb4aa;
+}
+
+.examples-button,
+.start-hint,
+.manual-input,
+.manual-input-placeholder,
+.search-button,
+.clear-button,
+.item-name,
+.item-date,
+.item-time,
+.item-days,
+.field-label {
+  color: #15201b;
+  font-family: var(--font-main);
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+.examples-button {
+  border: 1px solid rgba(21, 32, 27, 0.18);
+}
+
+.clear-button {
+  color: var(--color-danger-text);
+  border: 1px solid rgba(106, 36, 30, 0.26);
+  background: var(--color-danger-soft);
+}
+
+.search-button {
+  color: #1f5f45;
+  border: 1px solid rgba(31, 95, 69, 0.28);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.examples-button,
+.search-button,
+.clear-button,
+.start-hint,
+.manual-input-placeholder {
+  font-weight: 500;
+}
+
+.manual-input,
+.item-date,
+.item-time {
+  font-weight: 400;
+}
+
+.item-days {
+  font-weight: 600;
+}
+
+.item-name {
+  font-weight: 400;
+}
+
+.field-label {
+  font-weight: 600;
 }

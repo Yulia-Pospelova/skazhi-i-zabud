@@ -16,5 +16,5 @@
   --shadow-panel: 0 24px 70px rgba(41, 54, 47, 0.18);
   --shadow-card: 0 14px 34px rgba(55, 68, 61, 0.13);
   --radius: 18px;
-  --font-main: Arial, sans-serif;
+  --font-main: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
 }
