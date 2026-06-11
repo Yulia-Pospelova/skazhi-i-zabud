@@ -2,11 +2,6 @@
   font-family: Inter, "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Arial, sans-serif;
 }
 
-.app {
-  min-block-size: 100dvh;
-  padding-block-end: 12px;
-}
-
 .start-button {
   color: #12342b;
   background:
@@ -46,45 +41,4 @@
 
 .delete-button {
   border: 1px solid rgba(106, 36, 30, 0.16);
-}
-
-@media (max-width: 540px) {
-  .app {
-    padding-block-start: 8px;
-    padding-block-end: 8px;
-  }
-
-  .hero {
-    padding-block-end: 4px;
-  }
-
-  .capture {
-    padding: 12px;
-  }
-
-  .start-button {
-    min-block-size: 132px;
-  }
-
-  .phrase-form {
-    margin-top: 8px;
-  }
-
-  .phrase-input {
-    min-block-size: 48px;
-    padding-block: 10px;
-  }
-
-  .manual-form {
-    margin-top: 6px;
-  }
-
-  .manual-input {
-    min-block-size: 44px;
-    padding-block: 10px;
-  }
-
-  .timeline {
-    margin-top: 8px;
-  }
 }
