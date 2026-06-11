@@ -440,7 +440,7 @@ function initApp() {
       }
     } catch (error) {}
     try { startExpiryTicker(); } catch (error) { console.warn("ticker failed", error); }
-    try { registerServiceWorker(); } catch (error) { console.warn("sw failed", error); }
+    try { disableServiceWorkerForDesignPreview(); } catch (error) { console.warn("sw cleanup failed", error); }
     try { setupDebugPanel(); } catch (error) { console.warn("debug failed", error); }
     try { setupSettings(); } catch (error) { console.warn("settings failed", error); }
     try { populateTimeSelects(); } catch (error) { console.warn("time selects failed", error); }
@@ -5220,14 +5220,35 @@ function saveItems() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
 
-function registerServiceWorker() {
+function disableServiceWorkerForDesignPreview() {
   if (!("serviceWorker" in navigator)) {
     return;
   }
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js").catch((error) => {
-      console.warn("Service worker registration failed", error);
-    });
+    navigator.serviceWorker.getRegistrations()
+      .then((registrations) => Promise.all(
+        registrations.map((registration) => registration.unregister()),
+      ))
+      .then(() => (
+        "caches" in window
+          ? caches.keys().then((cacheNames) => Promise.all(
+            cacheNames
+              .filter((cacheName) => cacheName.startsWith("skazhi-i-zabud"))
+              .map((cacheName) => caches.delete(cacheName)),
+          ))
+          : null
+      ))
+      .then(() => {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get("sw") === "off") {
+          return;
+        }
+        url.searchParams.set("sw", "off");
+        window.location.replace(url.toString());
+      })
+      .catch((error) => {
+        console.warn("Service worker cleanup failed", error);
+      });
   });
 }
