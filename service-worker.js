@@ -1,9 +1,13 @@
-const CACHE_NAME = "skazhi-i-zabud-dev-v98";
-// Design preview mode: keep HTML/CSS/JS network-first while the visual style is changing.
-// Before release, restore the app shell cache for "./", "./index.html", "./script.js", and CSS files.
+const CACHE_NAME = "skazhi-i-zabud-v97";
 const APP_SHELL = [
+  "./",
+  "./index.html",
+  "./script.js",
   "./manifest.webmanifest",
   "./fonts/fonts.css",
+  "./styles/variables.css",
+  "./styles/globals.css",
+  "./styles/style.css",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon.svg",
