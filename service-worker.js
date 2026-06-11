@@ -1,104 +1,32 @@
-const CACHE_NAME = "skazhi-i-zabud-dev-v98";
-// Design preview mode: keep HTML/CSS/JS network-first while the visual style is changing.
-// Before release, restore the app shell cache for "./", "./index.html", "./script.js", and CSS files.
-const APP_SHELL = [
-  "./manifest.webmanifest",
-  "./fonts/fonts.css",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
-  "./icons/icon.svg",
-];
+// Temporary design-preview service worker.
+// It removes old PWA caches and unregisters itself so phones fetch fresh files.
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)),
-  );
   self.skipWaiting();
+  event.waitUntil(clearPreviewCaches());
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => (
-      Promise.all(
-        cacheNames
-          .filter((cacheName) => cacheName !== CACHE_NAME)
-          .map((cacheName) => caches.delete(cacheName)),
-      )
-    )),
+    clearPreviewCaches()
+      .then(() => self.registration.unregister())
+      .then(() => self.clients.matchAll({ type: "window", includeUncontrolled: true }))
+      .then((clients) => Promise.all(clients.map((client) => client.navigate(client.url)))),
   );
-  self.clients.claim();
 });
-
-function isCacheFirst(pathname) {
-  return (
-    pathname.includes("/fonts/") ||
-    pathname.includes("/icons/")
-  );
-}
 
 self.addEventListener("fetch", (event) => {
-  const request = event.request;
-
-  if (request.method !== "GET") {
-    return;
-  }
-
-  const requestUrl = new URL(request.url);
-
-  if (requestUrl.origin !== self.location.origin) {
-    return;
-  }
-
-  const isDocument =
-    request.mode === "navigate" || request.destination === "document";
-
-  if (!isDocument && isCacheFirst(requestUrl.pathname)) {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) {
-          return cached;
-        }
-        return fetch(request).then((networkResponse) => {
-          const clone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          return networkResponse;
-        });
-      }),
-    );
-    return;
-  }
-
-  event.respondWith(
-    fetch(request)
-      .then((networkResponse) => {
-        const clone = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-        return networkResponse;
-      })
-      .catch(() => (
-        caches.match(request).then((cachedResponse) => (
-          cachedResponse || caches.match("./index.html")
-        ))
-      )),
-  );
+  event.respondWith(fetch(event.request));
 });
 
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
+function clearPreviewCaches() {
+  if (!self.caches) {
+    return Promise.resolve();
+  }
 
-  event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
-      const currentClient = clients.find((client) => "focus" in client);
-
-      if (currentClient) {
-        return currentClient.focus();
-      }
-
-      if (self.clients.openWindow) {
-        return self.clients.openWindow("./");
-      }
-
-      return null;
-    }),
-  );
-});
+  return caches.keys().then((cacheNames) => Promise.all(
+    cacheNames
+      .filter((cacheName) => cacheName.startsWith("skazhi-i-zabud"))
+      .map((cacheName) => caches.delete(cacheName)),
+  ));
+}
