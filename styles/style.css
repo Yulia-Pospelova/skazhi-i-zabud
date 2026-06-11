@@ -1075,10 +1075,10 @@ button:focus {
   position: relative;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at 18% 12%, rgba(164, 240, 224, 0.74), transparent 24rem),
-    radial-gradient(circle at 86% 10%, rgba(172, 214, 238, 0.72), transparent 24rem),
-    radial-gradient(circle at 78% 78%, rgba(188, 237, 209, 0.58), transparent 22rem),
-    linear-gradient(160deg, #f4faf5 0%, #e9f5ef 44%, #d7eef4 100%);
+    radial-gradient(circle at 12% 6%, rgba(255, 219, 185, 0.86), transparent 28rem),
+    radial-gradient(circle at 88% 14%, rgba(122, 180, 214, 0.58), transparent 24rem),
+    radial-gradient(circle at 82% 76%, rgba(119, 235, 214, 0.38), transparent 20rem),
+    linear-gradient(145deg, #f9f4ea 0%, #eef5f0 45%, #dceaf0 100%);
 }
 
 .page::before {
