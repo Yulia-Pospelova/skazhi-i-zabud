@@ -1641,7 +1641,6 @@ async function handlePhrase(value, options = {}) {
   }
 
   if (hasDuplicateItem(parsed)) {
-    playSavedSound();
     showStatus(isSeriesActive ? "Такая запись уже есть" : "Такая запись уже есть");
     clearPhraseSoon();
     return true;
@@ -4482,13 +4481,13 @@ function playSavedBeep() {
   oscillator.frequency.setValueAtTime(880, now + 0.08);
 
   gain.gain.setValueAtTime(0.0001, now);
-  gain.gain.exponentialRampToValueAtTime(0.05, now + 0.015);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+  gain.gain.exponentialRampToValueAtTime(0.018, now + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.13);
 
   oscillator.connect(gain);
   gain.connect(audioContext.destination);
   oscillator.start(now);
-  oscillator.stop(now + 0.2);
+  oscillator.stop(now + 0.15);
 }
 
 function playAlarmSound() {
