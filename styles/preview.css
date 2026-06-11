@@ -3,13 +3,13 @@
 }
 
 .start-button {
-  color: #12342b;
+  color: #f8fff9;
   background:
-    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.6), transparent 4.5rem),
-    linear-gradient(145deg, #b9eee3, #8bd7ca);
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.3), transparent 4.5rem),
+    linear-gradient(145deg, #50a678, #2d8056);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    0 16px 34px rgba(32, 111, 73, 0.12);
+    0 16px 34px rgba(32, 111, 73, 0.2);
 }
 
 .start-button.is-listening,
@@ -31,8 +31,8 @@
 .calendar-clear-time-button,
 .edit-voice-button,
 .edit-manual-button {
-  border: 2px solid rgba(22, 115, 72, 0.42);
-  background-color: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(21, 32, 27, 0.14);
+  background-color: rgba(255, 255, 255, 0.58);
 }
 
 .edit-button {
