@@ -72,6 +72,7 @@ const AI_PROXY_URL = ""; // ИИ/облако отключены: приложе
 const AI_REQUEST_TIMEOUT_MS = 3500;
 const AI_MIN_NAME_LENGTH = 2;
 const DEBUG_MODE = new URLSearchParams(window.location.search).has("debug");
+const PREVIEW_THEMES = new Set(["calm", "warm", "dark"]);
 const MESSAGE_VISIBLE_MS = 4000;
 const SHORT_MESSAGE_VISIBLE_MS = 2200;
 const SINGLE_CLICK_DELAY_MS = 420;
@@ -420,6 +421,7 @@ if (document.readyState === "loading") {
 
 function initApp() {
   try {
+    applyPreviewTheme();
     assignElements();
     items = sortByDate(loadItems());
     removeExpiredItems();
@@ -636,6 +638,16 @@ function initApp() {
   } catch (error) {
     console.error("App init failed", error);
   }
+}
+
+function applyPreviewTheme() {
+  const theme = new URLSearchParams(window.location.search).get("theme");
+
+  if (!theme || !PREVIEW_THEMES.has(theme)) {
+    return;
+  }
+
+  document.body.classList.add(`theme-${theme}`);
 }
 
 function assignElements() {
