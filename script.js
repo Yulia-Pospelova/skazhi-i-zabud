@@ -2530,6 +2530,7 @@ function getCorrectedItem(item, value) {
 
   if (commandType === "time") {
     const relativeTime = getRelativeCorrectionTime(cleanedValue);
+    const shiftedTime = getShiftedCorrectionTime(item, cleanedValue);
     const period = parseDayPeriod(cleanedValue);
     const time = parseCorrectionTime(cleanedValue);
 
@@ -2538,6 +2539,17 @@ function getCorrectedItem(item, value) {
         ...item,
         date: relativeTime.date,
         time: relativeTime.time,
+        period: "",
+        displayDate: "",
+        source: value.trim(),
+      };
+    }
+
+    if (shiftedTime) {
+      return {
+        ...item,
+        date: shiftedTime.date,
+        time: shiftedTime.time,
         period: "",
         displayDate: "",
         source: value.trim(),
@@ -2611,6 +2623,7 @@ function inferCorrectionType(item, cleanedValue) {
   // Иначе пробуем как время.
   if (
     getRelativeCorrectionTime(cleanedValue) ||
+    getShiftedCorrectionTime(item, cleanedValue) ||
     parseDayPeriod(cleanedValue) ||
     parseCorrectionTime(cleanedValue)
   ) {
@@ -2621,27 +2634,8 @@ function inferCorrectionType(item, cleanedValue) {
 }
 
 function getRelativeCorrectionTime(value) {
-  const normalized = normalize(value);
-  let relative = parseRelativeDate(`напоминание ${normalized}`);
-
-  // «на 5 минут» / «5 минут» (без слова «через») трактуем как перенос на
-  // N минут от текущего момента — как «через 5 минут». Только МИНУТЫ:
-  // «на 2 часа» означает время 2:00, а не «через 2 часа», поэтому часы сюда
-  // не попадают.
-  if (!relative) {
-    const minuteWords = Object.keys(amountWordMap)
-      .sort((a, b) => b.length - a.length)
-      .join("|");
-    const minuteRegex = new RegExp(
-      `^(?:на\\s+)?(?:\\d+|${minuteWords})\\s+минут(?:у|ы)?$`,
-    );
-
-    if (minuteRegex.test(normalized)) {
-      relative = parseRelativeDate(
-        `напоминание через ${normalized.replace(/^на\s+/, "")}`,
-      );
-    }
-  }
+  // «через N минут/часов» — перенос на столько от текущего момента.
+  const relative = parseRelativeDate(`напоминание ${normalize(value)}`);
 
   if (!relative || !["minute", "hour"].includes(relative.unit)) {
     return null;
@@ -2650,6 +2644,69 @@ function getRelativeCorrectionTime(value) {
   return {
     date: toIsoDate(relative.date),
     time: getTimeFromRelative(relative),
+  };
+}
+
+// «на 5 минут (позже)», «на 2 часа раньше» — СДВИГ существующего времени
+// напоминания. По умолчанию (без слова «позже/раньше») сдвигаем вперёд.
+// Часы сдвигаем только при явном направлении: «на 2 часа» без слова — это
+// установка времени 2:00, а не сдвиг.
+function getShiftedCorrectionTime(item, value) {
+  if (!item || !item.date || !item.time) {
+    return null;
+  }
+
+  const normalized = normalize(value);
+
+  if (/через/.test(normalized)) {
+    return null;
+  }
+
+  const direction = /(раньше|пораньше|назад|пораньше)/.test(normalized)
+    ? -1
+    : /(позже|попозже|позднее|вперёд|вперед)/.test(normalized)
+      ? 1
+      : 0;
+
+  const amountWords = Object.keys(amountWordMap)
+    .sort((a, b) => b.length - a.length)
+    .join("|");
+  const match = normalized.match(
+    new RegExp(`(?:^|\\s)(?:на\\s+)?(?:(полчаса|пол\\s*часа)|(\\d+|${amountWords})\\s+(минут\\w*|минуту|час\\w*))`),
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  let amount;
+  let isHour;
+
+  if (match[1]) {
+    // «полчаса» — это 30 минут, единица уже внутри слова.
+    amount = 30;
+    isHour = false;
+  } else {
+    isHour = match[3].startsWith("час");
+    amount = /^\d+$/.test(match[2]) ? Number(match[2]) : amountWordMap[match[2]];
+  }
+
+  // Часы без явного «позже/раньше» — это установка времени, а не сдвиг.
+  if (isHour && direction === 0) {
+    return null;
+  }
+
+  if (!amount) {
+    return null;
+  }
+
+  const sign = direction === -1 ? -1 : 1;
+  const deltaMinutes = (isHour ? amount * 60 : amount) * sign;
+  const shifted = new Date(parseItemDateTime(item).getTime() + deltaMinutes * 60000);
+
+  return {
+    date: toIsoDate(shifted),
+    time: `${String(shifted.getHours()).padStart(2, "0")}:${String(shifted.getMinutes()).padStart(2, "0")}`,
   };
 }
 
