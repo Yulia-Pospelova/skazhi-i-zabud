@@ -4324,6 +4324,67 @@ function createNativeRecognition() {
   let sessionActive = false;
   let ignoreResults = false;
 
+  // Приглушение системного «бипа» Android на время прослушивания.
+  const BeepMute = getCapacitorPlugin("BeepMute");
+  let unmuteTimer = null;
+
+  function muteBeep() {
+    if (!BeepMute) {
+      return;
+    }
+    if (unmuteTimer) {
+      clearTimeout(unmuteTimer);
+      unmuteTimer = null;
+    }
+    try {
+      const result = BeepMute.mute();
+      if (result && typeof result.catch === "function") {
+        result.catch(() => {});
+      }
+    } catch (error) {}
+  }
+
+  function unmuteBeepNow() {
+    if (unmuteTimer) {
+      clearTimeout(unmuteTimer);
+      unmuteTimer = null;
+    }
+    if (!BeepMute) {
+      return;
+    }
+    try {
+      const result = BeepMute.unmute();
+      if (result && typeof result.catch === "function") {
+        result.catch(() => {});
+      }
+    } catch (error) {}
+  }
+
+  // Возвращаем звук не сразу, а с задержкой — иначе при перезапуске
+  // прослушивания (режим серии) он успел бы пискнуть между циклами.
+  function scheduleUnmute() {
+    if (!BeepMute) {
+      return;
+    }
+    if (unmuteTimer) {
+      clearTimeout(unmuteTimer);
+    }
+    unmuteTimer = setTimeout(() => {
+      unmuteTimer = null;
+      unmuteBeepNow();
+    }, 1200);
+  }
+
+  // Если приложение свернули во время прослушивания — сразу вернуть звук,
+  // чтобы он не остался приглушённым.
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        unmuteBeepNow();
+      }
+    });
+  }
+
   function emit(type, payload) {
     (listeners[type] || []).forEach((callback) => {
       try {
@@ -4386,6 +4447,7 @@ function createNativeRecognition() {
       return;
     }
 
+    muteBeep();
     try {
       const response = await SpeechRecognition.start({
         language: adapter.lang || "ru-RU",
@@ -4403,6 +4465,7 @@ function createNativeRecognition() {
     } finally {
       sessionActive = false;
       emit("end", {});
+      scheduleUnmute();
     }
   }
 
@@ -4419,6 +4482,7 @@ function createNativeRecognition() {
     if (!sessionActive) {
       emit("end", {});
     }
+    scheduleUnmute();
   }
 
   const adapter = {
