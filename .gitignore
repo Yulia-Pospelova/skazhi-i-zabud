@@ -12,3 +12,8 @@ android/capacitor-cordova-android-plugins/
 android/local.properties
 android/.idea/
 .DS_Store
+
+# Подпись приложения — НИКОГДА не коммитить (приватный ключ и пароли!)
+android/keystore.properties
+*.jks
+*.keystore
