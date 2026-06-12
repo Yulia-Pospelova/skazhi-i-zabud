@@ -119,3 +119,37 @@ const phrases = process.argv.slice(2).length
 for (const p of phrases) {
   console.log(`${show(p).padEnd(48)}  «${p}»`);
 }
+
+// --- Режим изменения (getCorrectedItem) ---
+console.log("\n--- изменение существующего напоминания (было: встреча, 20 июня, 14:00) ---");
+const baseItem = { id: "x", name: "встреча", date: "2026-06-20", time: "14:00", period: "", source: "" };
+
+function showEdit(phrase) {
+  let r;
+  try {
+    r = sandbox.getCorrectedItem(baseItem, phrase);
+  } catch (e) {
+    return `❌ ОШИБКА: ${e.message}`;
+  }
+  if (!r) {
+    return "❌ НЕ ПОНЯЛ";
+  }
+  const when = `${r.date}${r.time ? " " + r.time : ""}${r.period ? " (" + r.period + ")" : ""}`;
+  return `✅ имя="${r.name}" · ${when}`;
+}
+
+const editPhrases = [
+  "измени на 5 минут",
+  "изменить время на 5 минут",
+  "изменить время на 2 часа",       // должно стать 14:00 (время), НЕ «через 2 часа»
+  "изменить время на через 30 минут",
+  "изменить время на 9 вечера",
+  "изменить время на полвосьмого",
+  "изменить дату на завтра",
+  "изменить название на покупки",
+  "удалить время",
+];
+
+for (const p of editPhrases) {
+  console.log(`${showEdit(p).padEnd(48)}  «${p}»`);
+}

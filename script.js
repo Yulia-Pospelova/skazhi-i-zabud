@@ -2621,7 +2621,27 @@ function inferCorrectionType(item, cleanedValue) {
 }
 
 function getRelativeCorrectionTime(value) {
-  const relative = parseRelativeDate(`напоминание ${value}`);
+  const normalized = normalize(value);
+  let relative = parseRelativeDate(`напоминание ${normalized}`);
+
+  // «на 5 минут» / «5 минут» (без слова «через») трактуем как перенос на
+  // N минут от текущего момента — как «через 5 минут». Только МИНУТЫ:
+  // «на 2 часа» означает время 2:00, а не «через 2 часа», поэтому часы сюда
+  // не попадают.
+  if (!relative) {
+    const minuteWords = Object.keys(amountWordMap)
+      .sort((a, b) => b.length - a.length)
+      .join("|");
+    const minuteRegex = new RegExp(
+      `^(?:на\\s+)?(?:\\d+|${minuteWords})\\s+минут(?:у|ы)?$`,
+    );
+
+    if (minuteRegex.test(normalized)) {
+      relative = parseRelativeDate(
+        `напоминание через ${normalized.replace(/^на\s+/, "")}`,
+      );
+    }
+  }
 
   if (!relative || !["minute", "hour"].includes(relative.unit)) {
     return null;
