@@ -1,1 +1,14 @@
 tmp-vosk/
+
+# Capacitor / Node
+node_modules/
+www/
+
+# Android build artefacts
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/
+android/local.properties
+android/.idea/
+.DS_Store

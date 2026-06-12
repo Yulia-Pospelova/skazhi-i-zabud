@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">скажи и забудь</string>
+    <string name="title_activity_main">скажи и забудь</string>
+    <string name="package_name">ru.skazhizabud.app</string>
+    <string name="custom_url_scheme">ru.skazhizabud.app</string>
+</resources>

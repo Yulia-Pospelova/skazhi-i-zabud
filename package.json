@@ -1,0 +1,20 @@
+{
+  "name": "skazhi-i-zabud",
+  "version": "1.0.0",
+  "description": "Голосовые напоминания «скажи и забудь» — нативная обёртка через Capacitor",
+  "private": true,
+  "scripts": {
+    "build:web": "node scripts/copy-web.js",
+    "sync": "npm run build:web && cap sync",
+    "open:android": "cap open android"
+  },
+  "author": "Yulia Pospelova",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@capacitor-community/speech-recognition": "^7.0.1",
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/local-notifications": "^8.2.0"
+  }
+}

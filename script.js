@@ -311,6 +311,8 @@ const weekdayWordPattern = Object.keys(weekdayMap).sort((a, b) => b.length - a.l
 
 let items = [];
 let recognition = null;
+let nativeNotificationsGranted = false;
+let nativeNotifListenersReady = false;
 let statusTimer = null;
 let srStatusTimer = null;
 let notifyStatusTimer = null;
@@ -403,7 +405,9 @@ function updateNotifyToggle() {
   if (!notifyToggle) {
     return;
   }
-  const granted = ("Notification" in window) && Notification.permission === "granted";
+  const granted = isNativeApp()
+    ? nativeNotificationsGranted
+    : ("Notification" in window) && Notification.permission === "granted";
   notifyToggle.checked = granted;
 }
 
@@ -483,7 +487,9 @@ function initApp() {
     try { setupSpeech(); } catch (error) { console.warn("setupSpeech failed", error); }
     try { scheduleAllNotifications(); } catch (error) { console.warn("notif failed", error); }
     try {
-      if ("Notification" in window && Notification.permission === "default") {
+      if (isNativeApp()) {
+        initNativeNotifications();
+      } else if ("Notification" in window && Notification.permission === "default") {
         Notification.requestPermission()
           .then(() => { try { scheduleAllNotifications(); } catch (error) {} })
           .catch(() => {});
@@ -4276,21 +4282,194 @@ function splitSeriesPhrase(value) {
   return cleanChunks.length > 1 ? cleanChunks : [value];
 }
 
-function setupSpeech() {
-  const BrowserRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+// === Capacitor (нативное приложение Android/iOS) ====================
+// Эти помощники определяют, что приложение запущено как нативное
+// (через Capacitor), и дают доступ к нативным плагинам. В обычном
+// браузере (PWA) isNativeApp() возвращает false и ничего не меняется.
 
-  if (!BrowserRecognition) {
-    showStatus(
-      getVoiceUnavailableMessage(),
-    );
-    return;
+function isNativeApp() {
+  return Boolean(
+    window.Capacitor &&
+      typeof window.Capacitor.isNativePlatform === "function" &&
+      window.Capacitor.isNativePlatform(),
+  );
+}
+
+function getCapacitorPlugin(name) {
+  const cap = window.Capacitor;
+  if (!cap) {
+    return null;
+  }
+  if (cap.Plugins && cap.Plugins[name]) {
+    return cap.Plugins[name];
+  }
+  if (typeof cap.registerPlugin === "function") {
+    return cap.registerPlugin(name);
+  }
+  return null;
+}
+
+// Адаптер нативного распознавания речи: повторяет интерфейс
+// Web Speech API (start/stop/continuous/lang + события
+// result/end/error/speechstart), но внутри использует нативный плагин
+// SpeechRecognition. Благодаря этому весь остальной код голоса работает
+// без изменений.
+function createNativeRecognition() {
+  const SpeechRecognition = getCapacitorPlugin("SpeechRecognition");
+  if (!SpeechRecognition) {
+    return null;
   }
 
-  recognition = new BrowserRecognition();
-  recognition.lang = "ru-RU";
-  recognition.continuous = false;
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
+  const listeners = { result: [], end: [], error: [], speechstart: [] };
+  let sessionActive = false;
+  let ignoreResults = false;
+
+  function emit(type, payload) {
+    (listeners[type] || []).forEach((callback) => {
+      try {
+        callback(payload);
+      } catch (error) {
+        // Один сломанный обработчик не должен ронять остальные.
+      }
+    });
+  }
+
+  // Собираем событие в форме Web Speech API, чтобы
+  // getFinalPhraseFromResult() прочитал его без изменений.
+  function makeResultEvent(transcript) {
+    const alternative = { transcript };
+    const result = [alternative];
+    result.isFinal = true;
+    return { resultIndex: 0, results: [result] };
+  }
+
+  // Сообщения об ошибках от плагина приводим к кодам Web Speech API.
+  // Молчание/непонятную речь считаем "no-speech" — приложение их не
+  // показывает как ошибку и продолжает слушать в режиме серии.
+  function mapError(message) {
+    const text = String(message || "").toLowerCase();
+    if (
+      text.includes("permission") ||
+      text.includes("denied") ||
+      text.includes("not authorized") ||
+      text.includes("not allowed")
+    ) {
+      return "not-allowed";
+    }
+    return "no-speech";
+  }
+
+  async function ensurePermission() {
+    try {
+      let status = await SpeechRecognition.checkPermissions();
+      if (status.speechRecognition !== "granted") {
+        status = await SpeechRecognition.requestPermissions();
+      }
+      return status.speechRecognition === "granted";
+    } catch (error) {
+      return false;
+    }
+  }
+
+  async function doStart() {
+    if (sessionActive) {
+      return;
+    }
+    sessionActive = true;
+    ignoreResults = false;
+
+    const granted = await ensurePermission();
+    if (!granted) {
+      sessionActive = false;
+      emit("error", { error: "not-allowed" });
+      emit("end", {});
+      return;
+    }
+
+    try {
+      const response = await SpeechRecognition.start({
+        language: adapter.lang || "ru-RU",
+        maxResults: 5,
+        partialResults: false,
+        popup: false,
+      });
+      const matches = response && response.matches;
+      if (!ignoreResults && matches && matches.length && matches[0]) {
+        emit("result", makeResultEvent(matches[0]));
+      }
+    } catch (error) {
+      const message = (error && (error.message || error.errorMessage)) || "";
+      emit("error", { error: mapError(message) });
+    } finally {
+      sessionActive = false;
+      emit("end", {});
+    }
+  }
+
+  function doStop() {
+    ignoreResults = true;
+    try {
+      const result = SpeechRecognition.stop();
+      if (result && typeof result.catch === "function") {
+        result.catch(() => {});
+      }
+    } catch (error) {
+      // Распознавание уже могло остановиться.
+    }
+    if (!sessionActive) {
+      emit("end", {});
+    }
+  }
+
+  const adapter = {
+    lang: "ru-RU",
+    continuous: false,
+    interimResults: false,
+    maxAlternatives: 1,
+    start() {
+      // Запускаем асинхронно, но наружу отдаём синхронно, как Web Speech.
+      doStart();
+    },
+    stop() {
+      doStop();
+    },
+    abort() {
+      doStop();
+    },
+    addEventListener(type, callback) {
+      if (listeners[type]) {
+        listeners[type].push(callback);
+      }
+    },
+  };
+
+  return adapter;
+}
+
+function setupSpeech() {
+  if (isNativeApp()) {
+    recognition = createNativeRecognition();
+    if (!recognition) {
+      showStatus(getVoiceUnavailableMessage());
+      return;
+    }
+  } else {
+    const BrowserRecognition =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!BrowserRecognition) {
+      showStatus(
+        getVoiceUnavailableMessage(),
+      );
+      return;
+    }
+
+    recognition = new BrowserRecognition();
+    recognition.lang = "ru-RU";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+  }
 
   recognition.addEventListener("result", async (event) => {
     const phrase = applyVoiceCorrections(getFinalPhraseFromResult(event));
@@ -4437,6 +4616,34 @@ function getRecognitionErrorMessage() {
 }
 
 async function requestNotificationPermission() {
+  if (isNativeApp()) {
+    const LocalNotifications = getCapacitorPlugin("LocalNotifications");
+    if (!LocalNotifications) {
+      showNotifyStatus("уведомления недоступны");
+      return;
+    }
+    try {
+      let permission = await LocalNotifications.checkPermissions();
+      if (permission.display !== "granted") {
+        permission = await LocalNotifications.requestPermissions();
+      }
+      nativeNotificationsGranted = permission.display === "granted";
+      if (nativeNotificationsGranted) {
+        showNotifyStatus("уведомления включены");
+        scheduleAllNotifications();
+      } else {
+        showNotifyStatus(
+          permission.display === "denied"
+            ? "уведомления запрещены в настройках телефона"
+            : "уведомления не включены",
+        );
+      }
+    } catch (error) {
+      showNotifyStatus("не получилось включить уведомления");
+    }
+    return;
+  }
+
   if (!window.isSecureContext) {
     showNotifyStatus("уведомления работают только по защищенной ссылке https");
     return;
@@ -4704,6 +4911,13 @@ function clearPhraseInput() {
 }
 
 function scheduleItemNotifications(item) {
+  if (isNativeApp()) {
+    // На нативе планируем все напоминания скопом через систему — они
+    // приходят даже при закрытом приложении.
+    scheduleAllNotificationsNative();
+    return;
+  }
+
   if (!("Notification" in window) || Notification.permission !== "granted") {
     return;
   }
@@ -4718,8 +4932,119 @@ function scheduleItemNotifications(item) {
 }
 
 function scheduleAllNotifications() {
+  if (isNativeApp()) {
+    scheduleAllNotificationsNative();
+    return;
+  }
+
   clearNotificationTimers();
   items.forEach(scheduleItemNotifications);
+}
+
+// --- Нативные системные уведомления (Capacitor LocalNotifications) ---
+
+// Стабильный положительный 32-битный id из строкового id записи и времени.
+function makeNativeNotifId(itemId, timeMs) {
+  const source = `${itemId}|${timeMs}`;
+  let hash = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    hash = (hash * 31 + source.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash) % 2147483647 || 1;
+}
+
+async function scheduleAllNotificationsNative() {
+  const LocalNotifications = getCapacitorPlugin("LocalNotifications");
+  if (!LocalNotifications) {
+    return;
+  }
+
+  try {
+    // Снимаем все ранее запланированные, чтобы не было дублей и устаревших.
+    const pending = await LocalNotifications.getPending();
+    if (pending && pending.notifications && pending.notifications.length) {
+      await LocalNotifications.cancel({
+        notifications: pending.notifications.map((entry) => ({ id: entry.id })),
+      });
+    }
+
+    if (!nativeNotificationsGranted) {
+      return;
+    }
+
+    const now = Date.now();
+    const toSchedule = [];
+
+    items.forEach((item) => {
+      let times = [];
+      try {
+        times = getNotificationTimes(item);
+      } catch (error) {
+        times = [];
+      }
+
+      times.forEach((notificationTime) => {
+        const at = notificationTime.getTime();
+        if (!at || at <= now) {
+          return;
+        }
+        toSchedule.push({
+          id: makeNativeNotifId(item.id, at),
+          title: "напоминание",
+          body: `${formatDisplayName(item.name)}: ${formatItemDate(item)}`,
+          schedule: { at: new Date(at), allowWhileIdle: true },
+          extra: { itemId: item.id },
+        });
+      });
+    });
+
+    if (toSchedule.length) {
+      await LocalNotifications.schedule({ notifications: toSchedule });
+    }
+  } catch (error) {
+    console.warn("native notif schedule failed", error);
+  }
+}
+
+// Запрос разрешения и подписка на события при запуске нативного приложения.
+async function initNativeNotifications() {
+  const LocalNotifications = getCapacitorPlugin("LocalNotifications");
+  if (!LocalNotifications) {
+    return;
+  }
+
+  try {
+    let permission = await LocalNotifications.checkPermissions();
+    if (permission.display !== "granted" && permission.display !== "denied") {
+      permission = await LocalNotifications.requestPermissions();
+    }
+    nativeNotificationsGranted = permission.display === "granted";
+    updateNotifyToggle();
+
+    if (!nativeNotifListenersReady) {
+      nativeNotifListenersReady = true;
+      // Когда приложение открыто и срабатывает напоминание — звук и
+      // всплывающее окно, как в вебе. Системное уведомление покажется само.
+      LocalNotifications.addListener("localNotificationReceived", (notification) => {
+        if (reminderSettings.sound) {
+          try { playReminderSound(); } catch (error) {}
+        }
+        const itemId = notification && notification.extra && notification.extra.itemId;
+        const item = itemId && items.find((entry) => entry.id === itemId);
+        if (reminderSettings.popup && item &&
+            typeof document !== "undefined" &&
+            document.visibilityState === "visible") {
+          try { showInAppReminder(item); } catch (error) {}
+        }
+      });
+    }
+
+    if (nativeNotificationsGranted) {
+      scheduleAllNotifications();
+    }
+  } catch (error) {
+    console.warn("native notif init failed", error);
+  }
 }
 
 function clearNotificationTimers() {
@@ -5368,6 +5693,14 @@ function saveItems() {
 }
 
 function registerServiceWorker() {
+  // В нативном приложении страница уже грузится из локальных файлов, а
+  // обновления приходят через новую версию приложения, а не через
+  // service worker — поэтому его не регистрируем (иначе он может держать
+  // старые файлы в кэше).
+  if (isNativeApp()) {
+    return;
+  }
+
   if (!("serviceWorker" in navigator)) {
     return;
   }
