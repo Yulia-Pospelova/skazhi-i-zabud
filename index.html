@@ -20,6 +20,14 @@
   <body class="page">
     <main class="app">
       <section class="hero">
+        <button
+          class="theme-toggle-button"
+          type="button"
+          aria-pressed="false"
+          aria-label="включить тёмную тему"
+        >
+          <span aria-hidden="true">☾</span>
+        </button>
         <h1>скажи и забудь</h1>
         <div class="hero-actions">
           <button
@@ -214,9 +222,9 @@
           aria-label="инструкция"
           tabindex="-1"
         >
-          <div class="examples-dialog-head" style="position:relative;display:flex;align-items:center;justify-content:center;">
-            <h2 id="examples-dialog-title" style="margin:0;">как пользоваться</h2>
-            <button class="examples-close-button" type="button" aria-label="закрыть" style="position:absolute;right:0;top:0;inline-size:auto;width:auto;margin:0;padding:0 12px;min-block-size:42px;font-size:24px;line-height:1;border:0;border-radius:var(--radius);background:var(--color-control);color:var(--color-danger);outline:none;-webkit-tap-highlight-color:transparent;">×</button>
+          <div class="examples-dialog-head">
+            <h2 id="examples-dialog-title">как пользоваться</h2>
+            <button class="examples-close-button" type="button" aria-label="закрыть">×</button>
           </div>
           <div class="examples-panel">
             <h3 class="examples-title">Запись напоминания</h3>

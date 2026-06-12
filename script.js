@@ -33,6 +33,7 @@ let searchSilenceTimer = null;
 let manualSearchTimer = null;
 let manualIdleTimer = null;
 let examplesButton = null;
+let themeToggleButton = null;
 let examplesPanel = null;
 let examplesModal = null;
 let examplesCloseButton = null;
@@ -343,6 +344,7 @@ let lastParseError = "";
 let expiryTickerId = null;
 let reminderSettings = { sound: false, popup: false };
 const SETTINGS_KEY = "skazhi-settings";
+const THEME_KEY = "skazhi-theme";
 
 function loadSettings() {
   try {
@@ -366,6 +368,7 @@ function saveSettings() {
 
 function setupSettings() {
   loadSettings();
+  setupThemeToggle();
 
   if (soundToggle) {
     soundToggle.checked = reminderSettings.sound;
@@ -413,6 +416,51 @@ function toggleSettingsPanel() {
   if (notifyButton) {
     notifyButton.setAttribute("aria-expanded", String(!isOpen));
   }
+}
+
+function setupThemeToggle() {
+  applyStoredTheme();
+
+  if (!themeToggleButton) {
+    return;
+  }
+
+  updateThemeToggleButton();
+  themeToggleButton.addEventListener("click", () => {
+    const isDark = document.body.classList.toggle("theme-dark");
+    try {
+      localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
+    } catch (error) {}
+    updateThemeToggleButton();
+  });
+}
+
+function applyStoredTheme() {
+  const themeFromUrl = new URLSearchParams(window.location.search).get("theme");
+  let theme = "";
+
+  if (themeFromUrl && PREVIEW_THEMES.has(themeFromUrl)) {
+    theme = themeFromUrl;
+  } else {
+    try {
+      theme = localStorage.getItem(THEME_KEY) || "";
+    } catch (error) {}
+  }
+
+  if (theme === "dark") {
+    document.body.classList.add("theme-dark");
+  }
+}
+
+function updateThemeToggleButton() {
+  if (!themeToggleButton) {
+    return;
+  }
+
+  const isDark = document.body.classList.contains("theme-dark");
+  themeToggleButton.setAttribute("aria-pressed", String(isDark));
+  themeToggleButton.setAttribute("aria-label", isDark ? "включить светлую тему" : "включить тёмную тему");
+  themeToggleButton.innerHTML = `<span aria-hidden="true">${isDark ? "☀" : "☾"}</span>`;
 }
 
 if (document.readyState === "loading") {
@@ -677,6 +725,7 @@ function assignElements() {
   notifyToggle = document.querySelector(".setting-notify");
   settingsPanel = document.querySelector("#settings-panel");
   examplesButton = document.querySelector(".examples-button");
+  themeToggleButton = document.querySelector(".theme-toggle-button");
   examplesPanel = document.querySelector(".examples-panel");
   examplesModal = document.querySelector(".examples-modal");
   examplesCloseButton = document.querySelector(".examples-close-button");
@@ -2233,9 +2282,10 @@ function renderCalendarTimeInput(item) {
 
   let hh = "00";
   let mm = "00";
-  if (/^\d{2}:\d{2}$/.test(item.time || "")) {
-    hh = item.time.slice(0, 2);
-    let minutes = parseInt(item.time.slice(3, 5), 10);
+  const editedTime = pendingEditItem && pendingEditItem.time;
+  if (/^\d{2}:\d{2}$/.test(editedTime || "")) {
+    hh = editedTime.slice(0, 2);
+    let minutes = parseInt(editedTime.slice(3, 5), 10);
     minutes = Math.round(minutes / 5) * 5;
     if (minutes >= 60) minutes = 55;
     mm = String(minutes).padStart(2, "0");
@@ -2377,7 +2427,9 @@ function formatCreatedPhraseText(phrase, item) {
 }
 
 function formatRecognizedPhraseText(phrase) {
-  const text = phrase.trim();
+  const text = phrase
+    .trim()
+    .replace(/\bЧерез\b/g, "через");
 
   if (!/^(измени|изменить|добавь|добавить|удали|удалить|убери|убрать)(\s|$)/i.test(text)) {
     return text;
@@ -2682,8 +2734,12 @@ function openEditDialog(item) {
   pendingEditItem = null;
   editVoiceActive = false;
   clearTimeout(editVoiceSilenceTimer);
-  hideEditConfirmButton();
-  hideEditVoiceResult();
+  if (editHasChanges) {
+    showEditConfirmButton();
+  } else {
+    hideEditConfirmButton();
+    hideEditVoiceResult();
+  }
   if (editVoiceStartButton) {
     editVoiceStartButton.classList.remove("is-listening");
     editVoiceStartButton.textContent = "старт";
@@ -2786,8 +2842,12 @@ function startEditVoiceListening() {
     editVoiceStartButton.classList.add("is-listening");
     editVoiceStartButton.textContent = "стоп";
   }
-  showEditConfirmButton();
-  showEditVoiceResult();
+  if (editHasChanges) {
+    showEditConfirmButton();
+  } else {
+    hideEditConfirmButton();
+    hideEditVoiceResult();
+  }
   hideStatus();
   restartRecognition();
   resetEditVoiceSilenceTimer();
@@ -2810,6 +2870,7 @@ function stopEditVoiceListening() {
     showEditConfirmButton();
   } else {
     hideEditConfirmButton();
+    hideEditVoiceResult();
   }
 }
 
