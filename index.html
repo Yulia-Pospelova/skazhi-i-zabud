@@ -128,7 +128,7 @@
           aria-labelledby="edit-dialog-title"
         >
           <div class="edit-dialog-head">
-            <h2 id="edit-dialog-title" style="font-size:17px;margin:0;min-inline-size:0;line-height:1.2;">изменение напоминания</h2>
+            <h2 id="edit-dialog-title" style="font-size:22px;margin:0;min-inline-size:0;line-height:1.2;">изменение напоминания</h2>
             <button class="edit-close-button search-close-button" type="button" aria-label="закрыть" style="font-size:24px;color:var(--color-danger);outline:none;-webkit-tap-highlight-color:transparent;">×</button>
           </div>
           <div class="edit-mode-buttons" role="group" aria-label="способ изменения">
@@ -141,7 +141,7 @@
           </div>
 
           <div class="edit-voice-panel">
-            <p class="edit-hint">Нажми кнопку и скажи, например:</p>
+            <p class="edit-hint">Нажми старт и скажи, например:</p>
             <div class="edit-examples">
               <p>- изменить название на ...</p>
               <p>- изменить дату на ...</p>
@@ -149,27 +149,27 @@
               <p>- добавить время</p>
               <p>- удалить время</p>
             </div>
-            <p class="edit-save-hint" style="margin:10px 0 0;text-align:left;">Чтобы сохранить изменения, нажми <span class="button-name">ок</span>.</p>
             <div class="edit-card-host" style="margin-top:8px;"></div>
             <button class="edit-voice-start-button" type="button">
               старт
             </button>
-            <p class="edit-preview-label" style="margin:14px 0 4px;font-weight:600;text-align:left;font-size:17px;">с изменениями:</p>
-            <div class="edit-preview-card"></div>
-            <button class="edit-confirm-button" type="button" hidden style="margin-top:10px;width:100%;min-height:46px;border:0;border-radius:12px;font-size:17px;background:var(--color-primary);color:#fff;">
-              ок
-            </button>
+            <div class="edit-voice-result" hidden>
+              <p class="edit-preview-label" style="margin:14px 0 4px;font-weight:600;text-align:left;font-size:17px;">с изменениями:</p>
+              <div class="edit-preview-card"></div>
+              <p class="edit-save-hint" style="margin:10px 0 0;text-align:left;">Чтобы сохранить изменения, нажми <span class="button-name">ок</span>.</p>
+              <button class="edit-confirm-button" type="button" hidden style="margin-top:10px;width:100%;min-height:46px;border:0;border-radius:12px;font-size:17px;background:var(--color-primary);color:#fff;">
+                ок
+              </button>
+            </div>
           </div>
 
           <div class="edit-manual-panel" hidden>
-            <p class="edit-save-hint" style="margin:0 0 8px;text-align:left;">Чтобы сохранить изменения, нажми <span class="button-name">ок</span>.</p>
             <div class="edit-manual-card" style="margin-bottom:14px;"></div>
             <div class="calendar-name-form" style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;text-align:left;">
               <input class="edit-name-input" id="edit-name-input" type="text" autocomplete="off" placeholder="название" aria-label="название" style="padding:8px 10px;font-size:16px;border-radius:10px;border:1px solid #ccc;outline:none;-webkit-tap-highlight-color:transparent;" />
             </div>
             <div class="manual-date-row" style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
-              <input class="manual-date-display" type="text" readonly placeholder="дата" aria-label="дата" style="flex:1;box-sizing:border-box;padding:8px 10px;font-size:16px;border-radius:10px;border:1px solid #ccc;outline:none;background:#fff;" />
-              <button class="calendar-toggle-button" type="button" aria-label="открыть календарь" style="min-width:48px;min-height:46px;border:1px solid #ccc;border-radius:10px;background:#fff;font-size:20px;">📅</button>
+              <button class="manual-date-display" type="button" aria-label="дата, открыть календарь">дата <span aria-hidden="true">📅</span></button>
             </div>
             <div class="calendar-time-block">
               <span class="calendar-time-label">время</span>
@@ -182,6 +182,7 @@
             </div>
             <p class="manual-preview-label" style="margin:14px 0 4px;font-weight:600;text-align:left;font-size:17px;">с изменениями:</p>
             <div class="edit-manual-preview"></div>
+            <p class="edit-save-hint edit-save-hint--manual" style="margin:10px 0 0;text-align:left;">Чтобы сохранить изменения, нажми <span class="button-name">ок</span>.</p>
             <button class="edit-manual-confirm-button" type="button" style="margin-top:10px;width:100%;min-height:46px;border:0;border-radius:12px;font-size:17px;background:var(--color-primary);color:#fff;">ок</button>
           </div>
 
@@ -192,7 +193,9 @@
         <div class="calendar-dialog" role="dialog" aria-modal="true" aria-label="календарь">
           <div class="calendar-head">
             <button class="calendar-prev-button" type="button" aria-label="предыдущий месяц">‹</button>
-            <h3 id="calendar-dialog-title">календарь</h3>
+            <button class="calendar-month-title-button" type="button">
+              <span id="calendar-dialog-title">календарь</span>
+            </button>
             <button class="calendar-next-button" type="button" aria-label="следующий месяц">›</button>
           </div>
           <div class="calendar-weekdays" aria-hidden="true">

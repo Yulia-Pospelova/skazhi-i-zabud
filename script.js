@@ -18,6 +18,7 @@ let editVoiceSilenceTimer = null;
 let editHasChanges = false;
 let pendingEditItem = null;
 let editPreviewCard = null;
+let editVoiceResult = null;
 let editManualCard = null;
 let editManualPreview = null;
 let manualDateDisplay = null;
@@ -54,6 +55,7 @@ let calendarTitle = null;
 let calendarGrid = null;
 let calendarPrevButton = null;
 let calendarNextButton = null;
+let calendarMonthTitleButton = null;
 let calendarTimeForm = null;
 let calendarTimeInput = null;
 let editNameInput = null;
@@ -540,6 +542,10 @@ function initApp() {
       });
     }
 
+    if (manualDateDisplay) {
+      manualDateDisplay.addEventListener("click", openCalendarDialog);
+    }
+
     if (calendarModal) {
       calendarModal.addEventListener("click", (event) => {
         if (event.target === calendarModal) {
@@ -570,6 +576,10 @@ function initApp() {
       calendarNextButton.addEventListener("click", () => {
         changeCalendarMonth(1);
       });
+    }
+
+    if (calendarMonthTitleButton) {
+      calendarMonthTitleButton.addEventListener("click", selectCalendarMonth);
     }
 
     if (calendarTimeForm) {
@@ -680,6 +690,7 @@ function assignElements() {
   editModal = document.querySelector(".edit-modal");
   editCard = document.querySelector(".edit-card-host");
   editPreviewCard = document.querySelector(".edit-preview-card");
+  editVoiceResult = document.querySelector(".edit-voice-result");
   editManualCard = document.querySelector(".edit-manual-card");
   editManualPreview = document.querySelector(".edit-manual-preview");
   manualDateDisplay = document.querySelector(".manual-date-display");
@@ -699,6 +710,7 @@ function assignElements() {
   calendarGrid = document.querySelector(".calendar-grid");
   calendarPrevButton = document.querySelector(".calendar-prev-button");
   calendarNextButton = document.querySelector(".calendar-next-button");
+  calendarMonthTitleButton = document.querySelector(".calendar-month-title-button");
   calendarTimeForm = document.querySelector(".calendar-time-form");
   calendarTimeInput = document.querySelector(".calendar-time-input");
   editNameInput = document.querySelector(".edit-name-input");
@@ -718,6 +730,12 @@ function scrollToAppTop() {
 
 function handleStartClick() {
   unlockAudio();
+
+  if (isSearchActive) {
+    stopSearchVoice();
+    cancelSearch();
+    return;
+  }
 
   // Повторное нажатие во время прослушивания работает как «стоп».
   if (isSeriesActive) {
@@ -806,6 +824,12 @@ function startManualSearchIdleTimer() {
 
 function startSearchListening() {
   unlockAudio();
+
+  if (isSearchActive) {
+    stopSearchVoice();
+    cancelSearch();
+    return;
+  }
 
   if (!recognition) {
     showVoiceUnavailableFallback("голосовой поиск недоступен, напиши напоминание вручную");
@@ -2161,6 +2185,27 @@ function selectCalendarDate(dateValue) {
   closeCalendarDialog();
 }
 
+function selectCalendarMonth() {
+  const base = pendingEditItem || items.find((currentItem) => currentItem.id === calendarItemId);
+
+  if (!base || calendarYear === null || calendarMonth === null) {
+    closeCalendarDialog();
+    return;
+  }
+
+  pendingEditItem = {
+    ...base,
+    date: toIsoDate(new Date(calendarYear, calendarMonth, 1)),
+    displayDate: `в ${monthPrepositionNames[calendarMonth]} ${calendarYear} года`,
+  };
+  editHasChanges = true;
+  renderEditPreviewCard(pendingEditItem);
+  updateManualDateDisplay();
+  renderCalendar();
+  playSavedSound();
+  closeCalendarDialog();
+}
+
 function populateTimeSelects() {
   if (hourSelect && !hourSelect.options.length) {
     for (let h = 0; h < 24; h += 1) {
@@ -2186,7 +2231,7 @@ function renderCalendarTimeInput(item) {
   }
   populateTimeSelects();
 
-  let hh = "09";
+  let hh = "00";
   let mm = "00";
   if (/^\d{2}:\d{2}$/.test(item.time || "")) {
     hh = item.time.slice(0, 2);
@@ -2638,6 +2683,7 @@ function openEditDialog(item) {
   editVoiceActive = false;
   clearTimeout(editVoiceSilenceTimer);
   hideEditConfirmButton();
+  hideEditVoiceResult();
   if (editVoiceStartButton) {
     editVoiceStartButton.classList.remove("is-listening");
     editVoiceStartButton.textContent = "старт";
@@ -2741,6 +2787,7 @@ function startEditVoiceListening() {
     editVoiceStartButton.textContent = "стоп";
   }
   showEditConfirmButton();
+  showEditVoiceResult();
   hideStatus();
   restartRecognition();
   resetEditVoiceSilenceTimer();
@@ -2777,6 +2824,7 @@ function resetEditVoiceSilenceTimer() {
 }
 
 function showEditConfirmButton() {
+  showEditVoiceResult();
   if (editConfirmButton) {
     editConfirmButton.hidden = false;
   }
@@ -2785,6 +2833,18 @@ function showEditConfirmButton() {
 function hideEditConfirmButton() {
   if (editConfirmButton) {
     editConfirmButton.hidden = true;
+  }
+}
+
+function showEditVoiceResult() {
+  if (editVoiceResult) {
+    editVoiceResult.hidden = false;
+  }
+}
+
+function hideEditVoiceResult() {
+  if (editVoiceResult) {
+    editVoiceResult.hidden = true;
   }
 }
 
@@ -2824,6 +2884,7 @@ function closeEditDialog() {
   pendingEditItem = null;
   clearTimeout(editVoiceSilenceTimer);
   hideEditConfirmButton();
+  hideEditVoiceResult();
   if (editVoiceStartButton) {
     editVoiceStartButton.classList.remove("is-listening");
     editVoiceStartButton.textContent = "старт";
@@ -2892,8 +2953,23 @@ function updateManualDateDisplay() {
   if (!manualDateDisplay) {
     return;
   }
-  const base = pendingEditItem || items.find((currentItem) => currentItem.id === calendarItemId);
-  manualDateDisplay.value = base ? getItemDateText(base) : "";
+  const original = items.find((currentItem) => currentItem.id === calendarItemId);
+  const hasDateChange = Boolean(
+    pendingEditItem &&
+    original &&
+    (
+      pendingEditItem.date !== original.date ||
+      (pendingEditItem.displayDate || "") !== (original.displayDate || "")
+    )
+  );
+  const text = hasDateChange ? getItemDateText(pendingEditItem) : "дата";
+  manualDateDisplay.classList.toggle("has-value", hasDateChange);
+  manualDateDisplay.innerHTML = "";
+  manualDateDisplay.append(document.createTextNode(text + " "));
+  const icon = document.createElement("span");
+  icon.setAttribute("aria-hidden", "true");
+  icon.textContent = "📅";
+  manualDateDisplay.append(icon);
 }
 
 function buildItemCard(item) {
@@ -3882,7 +3958,7 @@ function normalize(value) {
 }
 
 function formatDisplayName(value) {
-  return value.toLocaleLowerCase("ru-RU");
+  return String(value || "");
 }
 
 function showConfirm(message, onConfirm, options = {}) {
@@ -3902,14 +3978,19 @@ function showConfirm(message, onConfirm, options = {}) {
   const yes = document.createElement("button");
   yes.type = "button";
   yes.textContent = options.yesLabel || "да";
+  const isDangerConfirm = String(options.yesColor || "").includes("danger");
+  const confirmBackground = isDangerConfirm
+    ? "radial-gradient(circle at 50% 12%, rgba(255,255,255,.14), transparent 3.5rem),linear-gradient(145deg,#e06c62,#c6534b)"
+    : "radial-gradient(circle at 50% 12%, rgba(255,255,255,.16), transparent 3.5rem),linear-gradient(145deg,#39b978,#21865a)";
   yes.style.cssText =
-    "flex:1;min-height:46px;border:0;border-radius:12px;font-size:16px;color:#fff;" +
-    "background:" + (options.yesColor || "var(--color-danger,#d23c3c)") + ";";
+    "flex:1;min-height:46px;border:1px solid rgba(255,255,255,.32);border-radius:12px;" +
+    "font-size:16px;color:#fff;font-weight:700;text-shadow:0 1px 2px rgba(8,36,22,.22);" +
+    "box-shadow:0 14px 32px rgba(22,115,72,.24);background:" + confirmBackground + ";";
   const no = document.createElement("button");
   no.type = "button";
   no.textContent = options.noLabel || "отмена";
   no.style.cssText =
-    "flex:1;min-height:46px;border:0;border-radius:12px;font-size:16px;" +
+    "flex:1;min-height:46px;border:0;border-radius:12px;font-size:16px;font-weight:700;" +
     "background:#e2e2e2;color:#222;";
   yes.addEventListener("click", () => { overlay.remove(); onConfirm(); });
   no.addEventListener("click", () => overlay.remove());
@@ -4049,6 +4130,7 @@ function appendLabeledText(container, label, value) {
 
   labelElement.className = "field-label";
   labelElement.textContent = `${label}: `;
+  valueElement.className = "field-value";
   valueElement.textContent = value;
   container.append(labelElement, valueElement);
 }

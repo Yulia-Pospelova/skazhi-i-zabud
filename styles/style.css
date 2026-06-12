@@ -1592,6 +1592,184 @@ h1 {
   font-weight: 400;
 }
 
+.search-button,
+.clear-button {
+  min-block-size: 42px;
+  padding: 0 10px;
+  font-size: 15px;
+}
+
+.item,
+.search-result,
+.edit-card {
+  border-color: rgba(31, 95, 69, 0.2);
+  background:
+    radial-gradient(circle at 88% 12%, rgba(119, 235, 214, 0.18), transparent 7rem),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(229, 241, 235, 0.9));
+  box-shadow: 0 12px 28px rgba(45, 61, 52, 0.12);
+}
+
+.button-name {
+  background:
+    radial-gradient(circle at 80% 18%, rgba(119, 235, 214, 0.3), transparent 3rem),
+    rgba(226, 241, 232, 0.9);
+}
+
+.edit-voice-start-button,
+.edit-ok-button,
+.edit-confirm-button,
+.edit-manual-confirm-button {
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  background:
+    radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.16), transparent 3.5rem),
+    linear-gradient(145deg, #39b978, #21865a) !important;
+  box-shadow: 0 14px 32px rgba(22, 115, 72, 0.24);
+  text-shadow: 0 1px 2px rgba(8, 36, 22, 0.22);
+}
+
+.edit-voice-start-button.is-listening {
+  background:
+    radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.14), transparent 3.5rem),
+    linear-gradient(145deg, #e06c62, #c6534b) !important;
+}
+
+.edit-dialog h2 {
+  font-size: 22px;
+}
+
 .field-label {
   font-weight: 600;
+}
+
+.timeline-head {
+  grid-template-columns: repeat(2, minmax(92px, 1fr));
+}
+
+.search-button,
+.clear-button {
+  min-block-size: 42px;
+  padding: 0 10px;
+}
+
+.search-modal {
+  background:
+    radial-gradient(circle at 16% 10%, rgba(211, 190, 242, 0.54), transparent 26rem),
+    linear-gradient(180deg, #ffffff 0%, #faf7ff 50%, #f1edf8 100%);
+}
+
+.edit-voice-button,
+.edit-manual-button {
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  background:
+    radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.16), transparent 3.5rem),
+    linear-gradient(145deg, #39b978, #21865a);
+  box-shadow: 0 14px 32px rgba(22, 115, 72, 0.24);
+  text-shadow: 0 1px 2px rgba(8, 36, 22, 0.22);
+}
+
+.edit-voice-button.is-active,
+.edit-manual-button.is-active {
+  color: #15201b;
+  border: 1px solid rgba(21, 32, 27, 0.14);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 8px 22px rgba(35, 48, 42, 0.08);
+  text-shadow: none;
+}
+
+.item-name,
+.search-result-name,
+.edit-card-name {
+  color: var(--color-muted);
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.field-label {
+  color: var(--color-text);
+}
+
+.field-value {
+  color: var(--color-muted);
+  font-weight: 400;
+}
+
+.examples-button {
+  background:
+    radial-gradient(circle at 80% 18%, rgba(119, 235, 214, 0.3), transparent 3rem),
+    rgba(226, 241, 232, 0.9);
+}
+
+.manual-date-display {
+  inline-size: 100%;
+  min-block-size: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--color-muted) !important;
+  font-family: var(--font-main);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.calendar-time-label {
+  color: var(--color-muted);
+  font-family: var(--font-main);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.calendar-clear-time-button {
+  color: var(--color-primary);
+  border: 0;
+  background: rgba(216, 234, 223, 0.9);
+  box-shadow: 0 8px 20px rgba(35, 48, 42, 0.08);
+}
+
+.edit-name-input,
+.calendar-hour-select,
+.calendar-minute-select {
+  color: var(--color-muted) !important;
+  font-family: var(--font-main);
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.edit-name-input::placeholder,
+.manual-date-display,
+.calendar-time-label {
+  color: var(--color-text) !important;
+  font-family: var(--font-main);
+  font-size: 16px;
+  font-weight: 600;
+  opacity: 1;
+}
+
+.manual-date-display.has-value {
+  color: var(--color-muted) !important;
+  font-weight: 400;
+}
+
+.calendar-month-title-button {
+  min-inline-size: 0;
+  min-block-size: 44px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius);
+  color: var(--color-text);
+  background: transparent;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.calendar-month-title-button:focus-visible {
+  outline: 2px solid rgba(31, 95, 69, 0.35);
+  outline-offset: 2px;
 }
