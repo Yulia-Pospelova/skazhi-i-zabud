@@ -214,6 +214,7 @@ const amountWordMap = {
   одна: 1,
   одну: 1,
   одно: 1,
+  пару: 2,
   два: 2,
   две: 2,
   три: 3,
@@ -224,6 +225,48 @@ const amountWordMap = {
   восемь: 8,
   девять: 9,
   десять: 10,
+  одиннадцать: 11,
+  двенадцать: 12,
+  тринадцать: 13,
+  четырнадцать: 14,
+  пятнадцать: 15,
+  шестнадцать: 16,
+  семнадцать: 17,
+  восемнадцать: 18,
+  девятнадцать: 19,
+  двадцать: 20,
+  "двадцать пять": 25,
+  тридцать: 30,
+  сорок: 40,
+  "сорок пять": 45,
+  пятьдесят: 50,
+  шестьдесят: 60,
+};
+// Разговорное «полвосьмого» = 7:30 («пол» + порядковый час → (час−1):30).
+const halfHourOrdinalMap = {
+  первого: 1,
+  второго: 2,
+  третьего: 3,
+  четвертого: 4,
+  четвёртого: 4,
+  пятого: 5,
+  шестого: 6,
+  седьмого: 7,
+  восьмого: 8,
+  девятого: 9,
+  десятого: 10,
+  одиннадцатого: 11,
+  двенадцатого: 12,
+};
+// Разговорное «без пятнадцати пять» = 4:45 (минуты до следующего часа).
+const toHourMinutesMap = {
+  пяти: 5,
+  десяти: 10,
+  пятнадцати: 15,
+  четверти: 15,
+  двадцати: 20,
+  "двадцати пяти": 25,
+  "двадцать пять": 25,
 };
 const dayWordMap = {
   первого: 1,
@@ -3286,8 +3329,11 @@ function parsePhrase(value, options = {}) {
   lastParseError = "";
   const phrase = normalize(value);
   const sourceText = value.trim();
-  const getName = (endIndex) => getParsedName(
-    options.preserveNameCase ? sourceText.slice(0, endIndex) : phrase.slice(0, endIndex),
+  // Название — это вся фраза с вырезанными метками даты/времени, где бы они
+  // ни стояли (в начале, середине или конце). Раньше брался только текст ДО
+  // даты, поэтому «завтра молоко» (когда в начале) не понималось.
+  const getName = () => getParsedName(
+    options.preserveNameCase ? sourceText : phrase,
   );
 
   if (!phrase) {
@@ -3301,7 +3347,7 @@ function parsePhrase(value, options = {}) {
   if (yearOnly) {
     return {
       id: createId(),
-      name: getName(yearOnly.index),
+      name: getName(),
       date: toIsoDate(yearOnly.date),
       time: null,
       period,
@@ -3317,7 +3363,7 @@ function parsePhrase(value, options = {}) {
   if (approximate) {
     return {
       id: createId(),
-      name: getName(approximate.index),
+      name: getName(),
       date: toIsoDate(approximate.date),
       time: parsedTime,
       period,
@@ -3330,7 +3376,7 @@ function parsePhrase(value, options = {}) {
   if (weekday) {
     return {
       id: createId(),
-      name: getName(weekday.index),
+      name: getName(),
       date: toIsoDate(weekday.date),
       time: parsedTime,
       period,
@@ -3340,7 +3386,7 @@ function parsePhrase(value, options = {}) {
 
   const exact = parseExactDate(phrase, relative);
   if (exact) {
-    const name = getName(exact.index);
+    const name = getName();
 
     return {
       id: createId(),
@@ -3355,7 +3401,7 @@ function parsePhrase(value, options = {}) {
 
   const named = parseNamedDate(phrase);
   if (named) {
-    const name = getName(named.index);
+    const name = getName();
 
     return {
       id: createId(),
@@ -3368,12 +3414,41 @@ function parsePhrase(value, options = {}) {
   }
 
   if (relative) {
-    const name = getName(relative.index);
+    const name = getName();
 
     return {
       id: createId(),
       name,
       date: toIsoDate(relative.date),
+      time: parsedTime,
+      period,
+      source: value.trim(),
+    };
+  }
+
+  // Время или часть суток без явного дня → считаем, что это «сегодня».
+  // Если время уже прошло сегодня — переносим на завтра.
+  // Так понимаются «таблетка в 8 вечера», «позвонить в 5 часов».
+  if (parsedTime || period) {
+    const anchor = startOfToday();
+
+    if (parsedTime) {
+      const [anchorHour, anchorMinute] = parsedTime.split(":").map(Number);
+      anchor.setHours(anchorHour, anchorMinute, 0, 0);
+      if (anchor.getTime() < Date.now()) {
+        anchor.setDate(anchor.getDate() + 1);
+      }
+    }
+
+    const name = getName();
+    if (name === "предмет") {
+      return null;
+    }
+
+    return {
+      id: createId(),
+      name,
+      date: toIsoDate(anchor),
       time: parsedTime,
       period,
       source: value.trim(),
@@ -3705,10 +3780,38 @@ function parseTime(phrase, options = {}) {
     return "00:00";
   }
 
+  if (/(?:^|\s)(?:в|на)?\s*полдень(?:\s|$)/.test(phrase)) {
+    return "12:00";
+  }
+
+  // «полвосьмого» = 7:30, «без пятнадцати пять» = 4:45 — разговорные формы.
+  const halfPast = parseHalfPastTime(phrase);
+  if (halfPast) {
+    return halfPast;
+  }
+
+  const toHour = parseToHourTime(phrase);
+  if (toHour) {
+    return toHour;
+  }
+
   const spokenTime = parseSpokenHourTime(phrase);
 
   if (spokenTime) {
     return spokenTime;
+  }
+
+  // «в 8 вечера», «в 5 утра» — цифра + часть суток без слова «часов».
+  // «на 2 дня» — это срок, а не время, поэтому такую пару пропускаем.
+  const digitDayPart = phrase.match(/(?:^|\s)(в|на)\s+(\d{1,2})\s+(утра|вечера|дня|ночи)(?:\s|$)/);
+  if (digitDayPart && !(digitDayPart[1] === "на" && digitDayPart[3] === "дня")) {
+    let dayPartHour = normalizeParsedHour(Number(digitDayPart[2]), digitDayPart[3]);
+    if (digitDayPart[3] === "ночи" && dayPartHour === 12) {
+      dayPartHour = 0;
+    }
+    if (dayPartHour <= 23) {
+      return `${String(dayPartHour).padStart(2, "0")}:00`;
+    }
   }
 
   const wordMatch = phrase.match(/(?:^|\s)(?:в|на)\s+час\s*(утра|вечера|дня|ночи)?/);
@@ -3760,7 +3863,7 @@ function parseTime(phrase, options = {}) {
 function parseSpokenHourTime(phrase) {
   const hourWords = Object.keys(hourWordMap).sort((a, b) => b.length - a.length).join("|");
   const regex = new RegExp(
-    `(?:^|\\s)(?:в|на)\\s+(${hourWords})(?:\\s+час(?:а|ов)?)?\\s*(утра|вечера|дня|ночи)?`,
+    `(?:^|\\s)(в|на)\\s+(${hourWords})(\\s+час(?:а|ов)?)?\\s*(утра|вечера|дня|ночи)?`,
   );
   const match = regex.exec(phrase);
 
@@ -3768,8 +3871,17 @@ function parseSpokenHourTime(phrase) {
     return null;
   }
 
-  let hour = hourWordMap[match[1]];
-  const dayPart = match[2];
+  const preposition = match[1];
+  const hasHourWord = Boolean(match[3]);
+  let hour = hourWordMap[match[2]];
+  const dayPart = match[4];
+
+  // «на пять (дней)», «на семь (человек)», «на два дня» — это срок или
+  // количество, а не время. Время с предлогом «на» допускаем только когда
+  // явно сказано «часов» или часть суток (кроме «дня»): «на восемь вечера».
+  if (preposition === "на" && !hasHourWord && (!dayPart || dayPart === "дня")) {
+    return null;
+  }
 
   hour = normalizeParsedHour(hour, dayPart);
 
@@ -3778,6 +3890,70 @@ function parseSpokenHourTime(phrase) {
   }
 
   return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function parseHalfPastTime(phrase) {
+  const ords = Object.keys(halfHourOrdinalMap).sort((a, b) => b.length - a.length).join("|");
+  const regex = new RegExp(
+    `(?:^|\\s)(?:в\\s+)?(?:пол\\s?-?\\s?(${ords})|половине\\s+(${ords}))\\s*(утра|вечера|дня|ночи)?`,
+  );
+  const match = regex.exec(phrase);
+
+  if (!match) {
+    return null;
+  }
+
+  const word = match[1] || match[2];
+  const dayPart = match[3];
+  let hour = halfHourOrdinalMap[word] - 1;
+
+  if (hour <= 0) {
+    hour = 12;
+  }
+
+  hour = normalizeParsedHour(hour, dayPart);
+
+  if (dayPart === "ночи" && hour === 12) {
+    hour = 0;
+  }
+
+  if (hour > 23) {
+    return null;
+  }
+
+  return `${String(hour).padStart(2, "0")}:30`;
+}
+
+function parseToHourTime(phrase) {
+  const mins = Object.keys(toHourMinutesMap).sort((a, b) => b.length - a.length).join("|");
+  const hours = Object.keys(hourWordMap).sort((a, b) => b.length - a.length).join("|");
+  const regex = new RegExp(
+    `(?:^|\\s)без\\s+(${mins})\\s+(${hours})\\s*(утра|вечера|дня|ночи)?`,
+  );
+  const match = regex.exec(phrase);
+
+  if (!match) {
+    return null;
+  }
+
+  const minutes = 60 - toHourMinutesMap[match[1]];
+  let hour = hourWordMap[match[2]] - 1;
+
+  if (hour < 0) {
+    hour = 23;
+  }
+
+  hour = normalizeParsedHour(hour, match[3]);
+
+  if (match[3] === "ночи" && hour === 12) {
+    hour = 0;
+  }
+
+  if (hour > 23) {
+    return null;
+  }
+
+  return `${String(hour).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 function normalizeParsedHour(hour, dayPart, options = {}) {
@@ -3994,30 +4170,69 @@ function getParsedName(rawName) {
 }
 
 function cleanName(name) {
-  return (
-    name
-      .replace(/\bсрок\b/g, "")
-      .replace(/\bпредмет\b/g, "")
-      .replace(/(?:^|\s)(?:до\s+)?\d{1,2}[./-]\d{1,2}(?:[./-]\d{2,4})?\.?(?=\s|$)/g, " ")
-      .replace(/\b(?:до|на)\s+(сегодня|завтра|послезавтра)\b/g, "")
-      .replace(/через\s+(полгода|пол\s+года|полгоду)/g, "")
-      .replace(/через\s+(минуту|час|день|неделю|месяц|год|(\d+)\s*(минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет))/g, "")
-      .replace(/\bв\s+следующ(?:ем|ий)\s+год(?:у)?/g, "")
-      .replace(/\bв\s+(начале|середине|конце)\s+(следующего\s+)?года/g, "")
-      .replace(/\bв\s+следующ(?:ем|ий)\s+месяц(?:е)?/g, "")
-      .replace(/\bв\s+(?:(начале|середине|конце)\s+)?(январь|январе|января|феврале|февраль|февраля|март|марте|марта|апрель|апреле|апреля|май|мае|мая|июнь|июне|июня|июль|июле|июля|август|августе|августа|сентябрь|сентябре|сентября|октябрь|октябре|октября|ноябрь|ноябре|ноября|декабрь|декабре|декабря)/g, "")
-      .replace(/\b(?:в|на)\s+(один|одна|два|две|три|четыре|пять|шесть|семь|восемь|девять|десять|одиннадцать|двенадцать|тринадцать|четырнадцать|пятнадцать|шестнадцать|семнадцать|восемнадцать|девятнадцать|двадцать|двадцать один|двадцать два|двадцать три)(?:\s+час(?:а|ов)?)?\s*(утра|вечера|дня|ночи)?/g, "")
-      .replace(/\b(?:в|на)\s+час\s*(утра|вечера|дня|ночи)?/g, "")
-      .replace(/\b(?:в|на)?\s*полночь\b/g, "")
-      .replace(/\b(?:(?:в|на)\s+)?\d{1,2}(?:(?::|\.)\d{2}|\s*(?:часа?|часов)(?:\s*(?:и\s*)?\d{1,2}\s*(?:минут|минуты|минута))?)\s*(утра|вечера|дня|ночи)?/g, "")
-      .replace(/(?:в\s+)?(?:следующий|следующая|следующее|следующей)?\s*(понедельник|понедельника|вторник|вторника|среду|среда|среды|четверг|четверга|пятницу|пятница|пятницы|субботу|суббота|субботы|воскресенье|воскресенья)/g, "")
-      .replace(/\b(утром|утро|днем|днём|день|вечером|вечер|ночью|ночь)\b/g, "")
-      .replace(/[.,!?]+/g, "")
-      .replace(/\s+/g, " ")
-      .replace(/(?:^|\s)(?:на|до)\s*$/g, "")
-      .trim()
-      || "предмет"
-  );
+  const months = monthWordPattern;
+  const weekdays = weekdayWordPattern;
+  const dayWords = Object.keys(dayWordMap).sort((a, b) => b.length - a.length).join("|");
+  const hourWords = Object.keys(hourWordMap).sort((a, b) => b.length - a.length).join("|");
+  const amountWords = Object.keys(amountWordMap).sort((a, b) => b.length - a.length).join("|");
+  const halfOrds = Object.keys(halfHourOrdinalMap).sort((a, b) => b.length - a.length).join("|");
+  const toMins = Object.keys(toHourMinutesMap).sort((a, b) => b.length - a.length).join("|");
+  const units = "минуту|минуты|минут|час|часа|часов|день|дня|дней|неделю|недели|недель|месяц|месяца|месяцев|год|года|лет";
+  const yearTail = "(?:\\s+(?:\\d{4}|следующего\\s+года?))?";
+  const dp = "(?:\\s*(?:утра|вечера|дня|ночи))?";
+  // Границы «слова» для кириллицы: встроенный \b в JS работает только с
+  // латиницей, поэтому используем свои просмотры назад/вперёд.
+  const L = "(?<![а-яёa-z0-9])";
+  const R = "(?![а-яёa-z0-9])";
+
+  let result = String(name || "");
+  const drop = (source) => {
+    result = result.replace(new RegExp(source, "gi"), " ");
+  };
+
+  drop(`${L}срок${R}`);
+  drop(`${L}предмет${R}`);
+
+  // --- время (раньше дат, чтобы «5 часов» не путалось с числом дня) ---
+  drop(`${L}(?:в\\s+)?(?:пол\\s?-?\\s?(?:${halfOrds})|половине\\s+(?:${halfOrds}))${dp}${R}`);
+  drop(`${L}без\\s+(?:${toMins})\\s+(?:${hourWords})${dp}${R}`);
+  drop(`${L}(?:в|на)\\s+(?:${hourWords})(?:\\s+час(?:а|ов)?)?${dp}${R}`);
+  drop(`${L}(?:в|на)\\s+час${dp}${R}`);
+  drop(`${L}(?:(?:в|на)\\s+)?пол(?:ночь|день)${R}`);
+  drop(`${L}(?:(?:в|на)\\s+)?\\d{1,2}(?:(?::|\\.)\\d{2}|\\s*(?:часа?|часов)(?:\\s*(?:и\\s*)?\\d{1,2}\\s*(?:минут|минуты|минута))?)${dp}${R}`);
+  drop(`${L}(?:в|на)\\s+\\d{1,2}\\s+(?:утра|вечера|дня|ночи)${R}`);
+
+  // --- относительные «через …» ---
+  drop(`${L}через\\s+(?:полгода|пол\\s+года|полгоду|(?:${amountWords}|\\d+)\\s+(?:${units})|${units})${R}`);
+
+  // --- «в следующем …», «в начале/середине/конце …» ---
+  drop(`${L}в\\s+следующ(?:ем|ий)\\s+год(?:у)?${R}`);
+  drop(`${L}в\\s+(?:начале|середине|конце)\\s+(?:следующего\\s+)?года${R}`);
+  drop(`${L}в\\s+следующ(?:ем|ий)\\s+месяц(?:е)?${R}`);
+  drop(`${L}в\\s+(?:(?:начале|середине|конце)\\s+)?(?:${months})${R}`);
+
+  // --- «до 2027», «до следующего года» ---
+  drop(`${L}до\\s+(?:\\d{4}|следующего\\s+года?|следующий\\s+года?)${R}`);
+
+  // --- точные даты: «1 марта», «первого марта», «до 5 апреля 2026», «до марта …» ---
+  drop(`${L}(?:до\\s+)?(?:\\d{1,2}|${dayWords})\\s+(?:${months})${yearTail}${R}`);
+  drop(`${L}до\\s+(?:${months})${yearTail}${R}`);
+  drop(`${L}(?:до\\s+)?\\d{1,2}[./-]\\d{1,2}(?:[./-]\\d{2,4})?\\.?${R}`);
+
+  // --- именованные дни и дни недели ---
+  drop(`${L}(?:до\\s+|на\\s+)?(?:сегодня|завтра|послезавтра)${R}`);
+  drop(`${L}(?:в\\s+|до\\s+)?(?:следующ(?:ий|ая|ее|ей)\\s+)?(?:${weekdays})${R}`);
+
+  // --- части суток ---
+  drop(`${L}(?:утром|утро|днем|днём|день|вечером|вечер|ночью|ночь)${R}`);
+
+  result = result
+    .replace(/[.,!?]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/(?:^|\s)(?:в|на|до)\s*$/gi, "")
+    .trim();
+
+  return result || "предмет";
 }
 
 function normalize(value) {
