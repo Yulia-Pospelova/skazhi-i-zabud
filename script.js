@@ -2976,7 +2976,7 @@ function startEditVoiceListening() {
     editVoiceStartButton.classList.add("is-listening");
     editVoiceStartButton.textContent = "стоп";
   }
-  if (editHasChanges) {
+  if (hasEditChange()) {
     showEditConfirmButton();
   } else {
     hideEditConfirmButton();
@@ -2999,8 +2999,8 @@ function stopEditVoiceListening() {
     editVoiceStartButton.classList.remove("is-listening");
     editVoiceStartButton.textContent = "старт";
   }
-  // «ок» остаётся, если были изменения; иначе прячем.
-  if (editHasChanges) {
+  // «ок» остаётся, только если правка реально отличается от исходной.
+  if (hasEditChange()) {
     showEditConfirmButton();
   } else {
     hideEditConfirmButton();
@@ -3041,6 +3041,25 @@ function hideEditVoiceResult() {
   if (editVoiceResult) {
     editVoiceResult.hidden = true;
   }
+}
+
+// Есть ли РЕАЛЬНОЕ изменение: сравниваем черновик с исходной записью.
+// Так карточка «ок» не выскакивает из-за «залипшего» флага (например, после
+// захода в ручное изменение, где поле времени могло прислать пустой «change»).
+function hasEditChange() {
+  if (!pendingEditItem) {
+    return false;
+  }
+  const original = items.find((currentItem) => currentItem.id === editingItemId);
+  if (!original) {
+    return false;
+  }
+  return (
+    pendingEditItem.name !== original.name ||
+    pendingEditItem.date !== original.date ||
+    (pendingEditItem.time || "") !== (original.time || "") ||
+    (pendingEditItem.period || "") !== (original.period || "")
+  );
 }
 
 function attemptCloseEdit() {
