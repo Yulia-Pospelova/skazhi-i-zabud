@@ -4321,14 +4321,21 @@ function formatDisplayName(value) {
 }
 
 function showConfirm(message, onConfirm, options = {}) {
+  const dark = document.body.classList.contains("theme-dark");
   const overlay = document.createElement("div");
+  // Плотная затемнённая подложка с размытием, чтобы фон страницы не
+  // отвлекал (особенно в тёмной теме).
   overlay.style.cssText =
-    "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);" +
+    "position:fixed;inset:0;z-index:99999;" +
+    "background:" + (dark ? "rgba(0,0,0,.82)" : "rgba(8,18,12,.55)") + ";" +
+    "backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);" +
     "display:flex;align-items:center;justify-content:center;padding:20px;";
   const box = document.createElement("div");
   box.style.cssText =
-    "background:#fff;color:#222;border-radius:16px;padding:22px;max-width:340px;" +
-    "width:100%;text-align:center;display:flex;flex-direction:column;gap:18px;";
+    "background:" + (dark ? "#1e2521" : "#fff") + ";" +
+    "color:" + (dark ? "#eef3f0" : "#222") + ";" +
+    "border-radius:16px;padding:22px;max-width:340px;width:100%;text-align:center;" +
+    "display:flex;flex-direction:column;gap:18px;box-shadow:0 20px 60px rgba(0,0,0,.45);";
   const text = document.createElement("p");
   text.textContent = message;
   text.style.cssText = "margin:0;font-size:18px;";
@@ -4350,14 +4357,15 @@ function showConfirm(message, onConfirm, options = {}) {
   no.textContent = options.noLabel || "отмена";
   no.style.cssText =
     "flex:1;min-height:46px;border:0;border-radius:12px;font-size:16px;font-weight:700;" +
-    "background:#e2e2e2;color:#222;";
+    "background:" + (dark ? "#39423d" : "#e2e2e2") + ";color:" + (dark ? "#eef3f0" : "#222") + ";";
   yes.addEventListener("click", () => { overlay.remove(); onConfirm(); });
   no.addEventListener("click", () => overlay.remove());
   row.append(no, yes);
   if (options.cardNode) {
     const cardWrap = document.createElement("div");
     cardWrap.style.cssText =
-      "background:var(--color-soft,#eef4f0);color:#222;border-radius:12px;" +
+      "background:" + (dark ? "#2a322d" : "var(--color-soft,#eef4f0)") + ";" +
+      "color:" + (dark ? "#eef3f0" : "#222") + ";border-radius:12px;" +
       "padding:14px;text-align:left;";
     cardWrap.append(options.cardNode);
     box.append(cardWrap, text, row);
