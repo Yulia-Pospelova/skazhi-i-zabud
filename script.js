@@ -363,6 +363,7 @@ let phraseTimer = null;
 let restartTimer = null;
 let seriesSilenceTimer = null;
 let editModalTimer = null;
+let themeSwitchTimer = null;
 let startClickTimer = null;
 let longPressTimer = null;
 let isLongPress = false;
@@ -474,6 +475,13 @@ function setupThemeToggle() {
 
   updateThemeToggleButton();
   themeToggleButton.addEventListener("click", () => {
+    // На время переключения включаем плавный переход цветов.
+    document.body.classList.add("theme-switching");
+    clearTimeout(themeSwitchTimer);
+    themeSwitchTimer = setTimeout(() => {
+      document.body.classList.remove("theme-switching");
+    }, 450);
+
     const isDark = document.body.classList.toggle("theme-dark");
     try {
       localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");

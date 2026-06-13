@@ -1083,6 +1083,18 @@ button:focus {
     linear-gradient(180deg, #ffffff 0%, #faf7ff 50%, #f1edf8 100%);
 }
 
+/* Плавное переключение темы: на ~0.4с включаем переход цветов, чтобы
+   текст, рамки и карточки перетекали, а не «прыгали». Класс вешается
+   скриптом только на момент переключения. */
+.theme-switching * {
+  transition:
+    background-color 350ms ease,
+    color 350ms ease,
+    border-color 350ms ease,
+    box-shadow 350ms ease,
+    fill 350ms ease !important;
+}
+
 .page::before {
   content: "";
   position: fixed;
@@ -1738,6 +1750,14 @@ h1 {
   font-family: var(--font-main);
   font-size: 16px;
   font-weight: 400;
+}
+
+/* Такая же аккуратная рамка, как у поля «название» и даты. */
+.calendar-hour-select,
+.calendar-minute-select {
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  background: #fff;
 }
 
 .edit-name-input::placeholder,
