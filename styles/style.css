@@ -1897,10 +1897,11 @@ h1 {
 .theme-dark .phrase-input,
 .theme-dark .manual-input {
   color: var(--color-text) !important;
-  border-color: rgba(132, 211, 169, 0.24);
+  /* Тихая рамка, чтобы поля не выглядели обведёнными белым на тёмном фоне. */
+  border-color: rgba(150, 200, 175, 0.12);
   background:
-    radial-gradient(circle at 80% 18%, rgba(94, 208, 142, 0.16), transparent 3rem),
-    rgba(35, 49, 43, 0.9);
+    radial-gradient(circle at 80% 18%, rgba(94, 208, 142, 0.1), transparent 3rem),
+    rgba(28, 40, 35, 0.94);
 }
 
 .theme-dark .manual-input-placeholder {
