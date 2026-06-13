@@ -520,7 +520,15 @@ function updateThemeToggleButton() {
   // («включить светлую тему, нажата»).
   themeToggleButton.setAttribute("aria-pressed", String(isDark));
   themeToggleButton.setAttribute("aria-label", "тёмная тема");
-  themeToggleButton.innerHTML = `<span aria-hidden="true">${isDark ? "☀" : "☾"}</span>`;
+  // Обновляем только символ значка (не пересоздаём узел) — иначе скринридер
+  // перечитывает кнопку и получается «нажата» дважды.
+  let themeIcon = themeToggleButton.querySelector("span");
+  if (!themeIcon) {
+    themeIcon = document.createElement("span");
+    themeIcon.setAttribute("aria-hidden", "true");
+    themeToggleButton.appendChild(themeIcon);
+  }
+  themeIcon.textContent = isDark ? "☀" : "☾";
 }
 
 if (document.readyState === "loading") {
@@ -586,8 +594,16 @@ function initApp() {
       seriesOkButton.addEventListener("click", finishSeriesByButton);
     }
 
-    if (manualForm) {
-      manualForm.addEventListener("submit", handleManualSubmit);
+    if (manualInput) {
+      // Раньше отправку ловила <form> (Enter), но тег формы скринридер
+      // объявлял лишним landmark'ом «форма». Теперь поле — обычный div,
+      // а Enter обрабатываем вручную.
+      manualInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          handleManualSubmit(event);
+        }
+      });
     }
 
     if (searchButton) {
@@ -605,12 +621,14 @@ function initApp() {
         }
       });
       manualInput.addEventListener("input", () => {
+        syncManualHint();
         if (manualSearchMode) {
           startManualSearchIdleTimer();
         } else {
           startManualIdleTimer();
         }
       });
+      syncManualHint();
       manualInput.addEventListener("blur", () => {
         if (manualSearchMode && !manualInput.value.trim()) {
           manualSearchMode = false;
@@ -932,6 +950,7 @@ function startManualIdleTimer() {
   }
   manualIdleTimer = setTimeout(() => {
     manualInput.value = "";
+    syncManualHint();
     manualInput.blur();
   }, 10000);
 }
@@ -942,6 +961,7 @@ function startManualSearchIdleTimer() {
     manualSearchMode = false;
     if (manualInput) {
       manualInput.value = "";
+      syncManualHint();
       manualInput.blur();
     }
     if (manualPlaceholder) {
@@ -1763,6 +1783,7 @@ async function handleManualSubmit(event) {
     manualSearchMode = false;
     clearTimeout(manualSearchTimer);
     manualInput.value = "";
+    syncManualHint();
     manualInput.blur();
     handleSearchPhrase(value);
     return;
@@ -1772,6 +1793,7 @@ async function handleManualSubmit(event) {
 
   if (result !== false) {
     manualInput.value = "";
+    syncManualHint();
     manualInput.blur();
     clearTimeout(manualIdleTimer);
   }
@@ -5389,6 +5411,15 @@ function clearPhraseSoon() {
 function showRecognizedPhrase(phrase) {
   phraseInput.value = phrase;
   phraseInput.classList.add("has-value");
+}
+
+// Показывает/прячет видимую подсказку «или напиши» по наличию текста.
+// Раньше это делал CSS через placeholder, но placeholder читался скринридером
+// как лишний текст («пробел»/повтор) — теперь без него.
+function syncManualHint() {
+  if (manualInput) {
+    manualInput.classList.toggle("has-text", Boolean(manualInput.value));
+  }
 }
 
 function clearPhraseInput() {

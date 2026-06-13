@@ -267,7 +267,7 @@ h1 {
   transform: translateY(-50%);
 }
 
-.manual-input:not(:placeholder-shown) + .manual-input-placeholder {
+.manual-input.has-text + .manual-input-placeholder {
   display: none;
 }
 
