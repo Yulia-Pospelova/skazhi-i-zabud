@@ -134,6 +134,14 @@ h1 {
   font-weight: 700;
 }
 
+/* Слово «ок» в подсказке — настоящая кнопка, но выглядит как button-name. */
+.edit-save-ok-inline {
+  border: 0;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .examples-note {
   margin-top: 0;
   padding-top: 6px;

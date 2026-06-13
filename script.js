@@ -646,6 +646,12 @@ function initApp() {
       editManualConfirmButton.addEventListener("click", showSaveConfirm);
     }
 
+    // Слово «ок» в подсказке «чтобы сохранить изменения, нажми ок» работает
+    // как кнопка — нажал на слово, и сохраняется/закрывается.
+    document.querySelectorAll(".edit-save-ok-inline").forEach((okWord) => {
+      okWord.addEventListener("click", showSaveConfirm);
+    });
+
     if (calendarToggleButton) {
       calendarToggleButton.addEventListener("click", () => {
         openCalendarDialog();
