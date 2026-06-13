@@ -364,6 +364,8 @@ let restartTimer = null;
 let seriesSilenceTimer = null;
 let editModalTimer = null;
 let themeSwitchTimer = null;
+let isAppSpeaking = false;
+let appSpeakingTimer = null;
 let startClickTimer = null;
 let longPressTimer = null;
 let isLongPress = false;
@@ -4933,6 +4935,12 @@ function setupSpeech() {
   }
 
   recognition.addEventListener("result", async (event) => {
+    // Пока приложение само говорит — не принимаем распознанное (это может быть
+    // его собственный голос или скринридер из динамика).
+    if (isAppSpeaking) {
+      return;
+    }
+
     const phrase = applyVoiceCorrections(getFinalPhraseFromResult(event));
 
     if (!phrase) {
@@ -5259,6 +5267,18 @@ function speak(message) {
   utterance.lang = "ru-RU";
   utterance.rate = 0.95;
 
+  // Пока приложение говорит — не реагируем на звук из микрофона, иначе оно
+  // может «услышать» собственный голос (или скринридер) и зациклиться.
+  isAppSpeaking = true;
+  clearTimeout(appSpeakingTimer);
+  const finishSpeaking = () => {
+    clearTimeout(appSpeakingTimer);
+    // Небольшой запас: распознаватель отвечает с задержкой после звука.
+    appSpeakingTimer = setTimeout(() => { isAppSpeaking = false; }, 500);
+  };
+  utterance.onend = finishSpeaking;
+  utterance.onerror = finishSpeaking;
+
   try {
     window.speechSynthesis.cancel();
   } catch (error) {
@@ -5268,6 +5288,9 @@ function speak(message) {
   setTimeout(() => {
     window.speechSynthesis.speak(utterance);
   }, 120);
+
+  // Подстраховка, если событие окончания речи не придёт.
+  appSpeakingTimer = setTimeout(() => { isAppSpeaking = false; }, 8000);
 }
 
 function playSavedSound() {
