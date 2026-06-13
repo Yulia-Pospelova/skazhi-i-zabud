@@ -513,8 +513,11 @@ function updateThemeToggleButton() {
   }
 
   const isDark = document.body.classList.contains("theme-dark");
+  // Семантика переключателя: метка постоянная («тёмная тема»), а состояние
+  // передаётся через «нажата/не нажата» — иначе скринридер путается
+  // («включить светлую тему, нажата»).
   themeToggleButton.setAttribute("aria-pressed", String(isDark));
-  themeToggleButton.setAttribute("aria-label", isDark ? "включить светлую тему" : "включить тёмную тему");
+  themeToggleButton.setAttribute("aria-label", "тёмная тема");
   themeToggleButton.innerHTML = `<span aria-hidden="true">${isDark ? "☀" : "☾"}</span>`;
 }
 
@@ -4394,7 +4397,7 @@ function showConfirm(message, onConfirm, options = {}) {
     "background:" + (dark ? "#39423d" : "#e2e2e2") + ";color:" + (dark ? "#eef3f0" : "#222") + ";";
   // Доступность: окно-предупреждение для скринридера.
   text.id = "confirm-dialog-message";
-  box.setAttribute("role", "alertdialog");
+  box.setAttribute("role", "dialog");
   box.setAttribute("aria-modal", "true");
   box.setAttribute("aria-labelledby", text.id);
   box.tabIndex = -1;
@@ -4477,7 +4480,10 @@ function renderList() {
   items.forEach((item) => {
     const element = document.createElement("li");
     element.className = "item";
-    element.setAttribute("role", "none");
+    // Группа со своей меткой — скринридер объявит «карточка напоминания»,
+    // когда пользователь заходит на карточку.
+    element.setAttribute("role", "group");
+    element.setAttribute("aria-label", "карточка напоминания");
     element.dataset.itemId = item.id;
 
     const content = document.createElement("div");
