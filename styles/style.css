@@ -1764,12 +1764,17 @@ h1 {
   font-weight: 400;
 }
 
-/* Такая же аккуратная рамка, как у поля «название» и даты. */
+/* Такая же аккуратная рамка, как у поля «название» и даты.
+   appearance:none обязателен — иначе нативный <select> игнорирует рамку
+   (и в светлой, и в тёмной теме). */
 .calendar-hour-select,
 .calendar-minute-select {
+  appearance: none;
+  -webkit-appearance: none;
   border: 1px solid #ccc;
   border-radius: 10px;
   background: #fff;
+  padding: 8px 10px;
 }
 
 .edit-name-input::placeholder,
@@ -1889,6 +1894,14 @@ h1 {
 .theme-dark .edit-name-input::placeholder,
 .theme-dark .manual-date-display:not(.has-value) {
   color: var(--color-muted) !important;
+}
+
+/* В тёмной теме дата и время — такая же серая рамка, как у поля «название»
+   (у него рамка #ccc из инлайн-стиля). Так все три поля выглядят одинаково. */
+.theme-dark .manual-date-display,
+.theme-dark .calendar-hour-select,
+.theme-dark .calendar-minute-select {
+  border-color: #ccc;
 }
 
 .theme-dark .examples-button,

@@ -17,3 +17,6 @@ android/.idea/
 android/keystore.properties
 *.jks
 *.keystore
+
+# Локальный конфиг предпросмотра
+.claude/launch.json
