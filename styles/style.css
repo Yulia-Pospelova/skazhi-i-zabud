@@ -147,6 +147,18 @@ h1 {
   border-top: 0;
 }
 
+.examples-close-bottom {
+  margin-top: 14px;
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  border-radius: 12px;
+  font-size: 17px;
+  background: var(--color-primary);
+  color: #fff;
+  cursor: pointer;
+}
+
 .start-button.is-listening {
   background: var(--color-danger);
 }

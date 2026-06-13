@@ -663,11 +663,17 @@ function initApp() {
     }
 
     if (editVoiceButton) {
-      editVoiceButton.addEventListener("click", showVoiceEditPanel);
+      editVoiceButton.addEventListener("click", () => {
+        showVoiceEditPanel();
+        announceToScreenReader("голосовое изменение");
+      });
     }
 
     if (editManualButton) {
-      editManualButton.addEventListener("click", showManualEditPanel);
+      editManualButton.addEventListener("click", () => {
+        showManualEditPanel();
+        announceToScreenReader("ручное изменение");
+      });
     }
 
     if (editVoiceStartButton) {
@@ -739,6 +745,11 @@ function initApp() {
 
     if (examplesCloseButton) {
       examplesCloseButton.addEventListener("click", closeExamplesDialog);
+    }
+
+    const examplesCloseBottom = document.querySelector(".examples-close-bottom");
+    if (examplesCloseBottom) {
+      examplesCloseBottom.addEventListener("click", closeExamplesDialog);
     }
 
     document.addEventListener("keydown", handleDocumentKeydown);
@@ -2907,10 +2918,12 @@ function showVoiceEditPanel() {
 
   if (editVoiceButton) {
     editVoiceButton.classList.add("is-active");
+    editVoiceButton.setAttribute("aria-pressed", "true");
   }
 
   if (editManualButton) {
     editManualButton.classList.remove("is-active");
+    editManualButton.setAttribute("aria-pressed", "false");
   }
 }
 
@@ -2929,10 +2942,12 @@ function showManualEditPanel() {
 
   if (editVoiceButton) {
     editVoiceButton.classList.remove("is-active");
+    editVoiceButton.setAttribute("aria-pressed", "false");
   }
 
   if (editManualButton) {
     editManualButton.classList.add("is-active");
+    editManualButton.setAttribute("aria-pressed", "true");
   }
 
   const base = pendingEditItem || original;
