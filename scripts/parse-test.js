@@ -156,3 +156,24 @@ const editPhrases = [
 for (const p of editPhrases) {
   console.log(`${showEdit(p).padEnd(48)}  «${p}»`);
 }
+
+// --- Расписание уведомлений (getNotificationTimes) ---
+console.log("\n--- расписание уведомлений ---");
+const pad2 = (n) => String(n).padStart(2, "0");
+const fmtDT = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+function showNotif(label, item) {
+  const times = sandbox.getNotificationTimes(item).slice().sort((a, b) => a - b);
+  console.log(`\n${label}: «${item.name}» (${item.date}${item.time ? " " + item.time : " без времени"})`);
+  times.forEach((t) => console.log("   • " + fmtDT(t)));
+}
+const nowT = new Date();
+const plus = (ms) => new Date(nowT.getTime() + ms);
+const H = 3600 * 1000;
+const D = 24 * H;
+const soonD = plus(3 * H);
+showNotif("Событие <24ч", { id: "1", name: "созвон", date: sandbox.toIsoDate(soonD), time: pad2(soonD.getHours()) + ":" + pad2(soonD.getMinutes()), period: "" });
+const farD = plus(5 * D); farD.setHours(17, 0, 0, 0);
+showNotif("Событие >24ч (17:00)", { id: "2", name: "стрижка", date: sandbox.toIsoDate(farD), time: "17:00", period: "" });
+const earlyD = plus(5 * D); earlyD.setHours(7, 0, 0, 0);
+showNotif("Событие >24ч раннее (07:00)", { id: "3", name: "поезд", date: sandbox.toIsoDate(earlyD), time: "07:00", period: "" });
+showNotif("Без времени (через 10 дней)", { id: "4", name: "паспорт", date: sandbox.toIsoDate(plus(10 * D)), time: null, period: "" });

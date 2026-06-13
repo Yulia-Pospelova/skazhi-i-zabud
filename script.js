@@ -5483,6 +5483,9 @@ function isExpiredItem(item) {
   return dueDate < startOfToday();
 }
 
+// Во сколько напоминать про запись БЕЗ времени (срок/дедлайн) — утром.
+const DATE_ONLY_NOTIFY_HOUR = 8;
+
 function getNotificationTimes(item) {
   const dueDate = parseItemDateTime(item);
 
@@ -5491,17 +5494,18 @@ function getNotificationTimes(item) {
   }
 
   if (item.time) {
-    if (isSoonTimedEvent(dueDate)) {
-      return [dueDate];
-    }
-
     return getTimedEventNotificationTimes(dueDate);
   }
 
-  const times = [dueDate];
+  // Запись без времени: в день срока и заранее (за месяц/неделю/день),
+  // и всё это в 8 утра, а не в полночь.
+  const dueMorning = new Date(dueDate);
+  dueMorning.setHours(DATE_ONLY_NOTIFY_HOUR, 0, 0, 0);
+
+  const times = [dueMorning];
 
   reminderRules.forEach((reminder) => {
-    const notificationTime = new Date(dueDate);
+    const notificationTime = new Date(dueMorning);
     notificationTime.setDate(notificationTime.getDate() - reminder.days);
     times.push(notificationTime);
   });
@@ -5511,15 +5515,23 @@ function getNotificationTimes(item) {
 
 function getTimedEventNotificationTimes(dueDate) {
   const times = [dueDate];
-  const eveningBefore = new Date(dueDate);
-  eveningBefore.setDate(eveningBefore.getDate() - 1);
-  eveningBefore.setHours(20, 0, 0, 0);
-  times.push(eveningBefore);
 
-  const beforeEvent = new Date(dueDate);
-  const minutesBefore = dueDate.getHours() < 10 ? 30 : 120;
-  beforeEvent.setMinutes(beforeEvent.getMinutes() - minutesBefore);
-  times.push(beforeEvent);
+  // Незадолго до события: за час и за полчаса. Для раннего события (до 8:00)
+  // — только за полчаса, чтобы не будить заранее среди ночи.
+  const leadMinutes = dueDate.getHours() < 8 ? [30] : [60, 30];
+  leadMinutes.forEach((minutes) => {
+    const beforeEvent = new Date(dueDate);
+    beforeEvent.setMinutes(beforeEvent.getMinutes() - minutes);
+    times.push(beforeEvent);
+  });
+
+  // Накануне вечером в 20:00 — только если до события больше суток.
+  if (!isSoonTimedEvent(dueDate)) {
+    const eveningBefore = new Date(dueDate);
+    eveningBefore.setDate(eveningBefore.getDate() - 1);
+    eveningBefore.setHours(20, 0, 0, 0);
+    times.push(eveningBefore);
+  }
 
   return times;
 }
