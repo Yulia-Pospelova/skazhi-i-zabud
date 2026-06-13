@@ -3332,6 +3332,13 @@ function setStartButtonLabel(text) {
   if (label) {
     label.textContent = text;
   }
+  // Для скринридера: метка отражает текущее состояние записи.
+  if (startButton) {
+    startButton.setAttribute(
+      "aria-label",
+      text === "стоп" ? "остановить запись" : "начать голосовую запись",
+    );
+  }
 }
 
 function stopSeriesListening() {
@@ -4385,8 +4392,45 @@ function showConfirm(message, onConfirm, options = {}) {
   no.style.cssText =
     "flex:1;min-height:46px;border:0;border-radius:12px;font-size:16px;font-weight:700;" +
     "background:" + (dark ? "#39423d" : "#e2e2e2") + ";color:" + (dark ? "#eef3f0" : "#222") + ";";
-  yes.addEventListener("click", () => { overlay.remove(); onConfirm(); });
-  no.addEventListener("click", () => overlay.remove());
+  // Доступность: окно-предупреждение для скринридера.
+  text.id = "confirm-dialog-message";
+  box.setAttribute("role", "alertdialog");
+  box.setAttribute("aria-modal", "true");
+  box.setAttribute("aria-labelledby", text.id);
+  box.tabIndex = -1;
+
+  const previousFocus = document.activeElement;
+
+  function closeDialog() {
+    document.removeEventListener("keydown", onDialogKeydown, true);
+    overlay.remove();
+    if (previousFocus && typeof previousFocus.focus === "function") {
+      previousFocus.focus();
+    }
+  }
+
+  function onDialogKeydown(event) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeDialog();
+      return;
+    }
+    if (event.key === "Tab") {
+      // Ловушка фокуса между «отмена» и «да».
+      event.preventDefault();
+      event.stopPropagation();
+      const order = [no, yes];
+      const index = order.indexOf(document.activeElement);
+      const nextIndex = event.shiftKey
+        ? (index <= 0 ? order.length - 1 : index - 1)
+        : (index === order.length - 1 ? 0 : index + 1);
+      order[nextIndex].focus();
+    }
+  }
+
+  yes.addEventListener("click", () => { closeDialog(); onConfirm(); });
+  no.addEventListener("click", () => { closeDialog(); });
   row.append(no, yes);
   if (options.cardNode) {
     const cardWrap = document.createElement("div");
@@ -4401,6 +4445,11 @@ function showConfirm(message, onConfirm, options = {}) {
   }
   overlay.append(box);
   document.body.append(overlay);
+
+  document.addEventListener("keydown", onDialogKeydown, true);
+  // Фокус на «отмена» — безопасное действие по умолчанию. Текст вопроса
+  // скринридер зачитает сам (role="alertdialog" + aria-labelledby).
+  no.focus();
 }
 
 function renderList() {
